@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Coach - Interactive Chessboard</title>
+
+    <!-- chessboard.js CSS -->
+    <link rel="stylesheet" href="chessboard-1.0.0.min.css">
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+
+        #board {
+            margin: 20px auto;
+            max-width: 500px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-input-wrapper label {
+            display: inline-block;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 4px;
+            background-color: #2196F3;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .file-input-wrapper label:hover {
+            background-color: #0b7dda;
+        }
+
+        .info-panel {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .info-value {
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        .move-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2196F3;
+        }
+
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .status-message.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chess Coach - Interactive Board</h1>
+
+        <div id="status" class="status-message"></div>
+
+        <div id="board"></div>
+
+        <div class="info-panel">
+            <div class="info-row">
+                <span class="info-label">Move:</span>
+                <span class="info-value" id="moveNumber">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Last Move:</span>
+                <span class="info-value move-display" id="moveNotation">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Position:</span>
+                <span class="info-value" id="fenDisplay" style="font-size: 11px; word-break: break-all;">-</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="file-input-wrapper">
+                <input type="file" id="pgnFileInput" accept=".pgn" />
+                <label for="pgnFileInput">Load PGN</label>
+            </div>
+            <button id="startBtn" onclick="chessBoard.goToStart()">Start</button>
+            <button id="prevBtn" onclick="chessBoard.previousMove()">Previous</button>
+            <button id="nextBtn" onclick="chessBoard.nextMove()">Next</button>
+            <button id="endBtn" onclick="chessBoard.goToEnd()">End</button>
+            <button id="flipBtn" onclick="chessBoard.flipBoard()">Flip Board</button>
+            <button id="resetBtn" onclick="chessBoard.resetBoard()">Reset</button>
+        </div>
+    </div>
+
+    <!-- jQuery (required by chessboard.js) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- chessboard.js -->
+    <script src="chessboard-1.0.0.min.js"></script>
+
+    <!-- chess.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+
+    <script>
+        // Chess Board Controller
+        const chessBoard = (function() {
+            let board = null;
+            let game = new Chess();
+            let moveHistory = [];
+            let currentMoveIndex = -1;
+
+            // Initialize the board
+            function init() {
+                const config = {
+                    draggable: true,
+                    position: 'start',
+                    pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
+                    onDragStart: onDragStart,
+                    onDrop: onDrop,
+                    onSnapEnd: onSnapEnd
+                };
+
+                board = Chessboard('board', config);
+                updateDisplay();
+                updateButtons();
+            }
+
+            // Prevent dragging pieces when stepping through history
+            function onDragStart(source, piece, position, orientation) {
+                // Only allow dragging if we're at the current position (end of history)
+                if (currentMoveIndex < moveHistory.length - 1) {
+                    return false;
+                }
+
+                // Don't allow moves if game is over
+                if (game.game_over()) return false;
+
+                // Only pick up pieces for the side to move
+                if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                    (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                    return false;
+                }
+            }
+
+            function onDrop(source, target) {
+                // Try to make the move
+                const move = game.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q' // Always promote to queen for simplicity
+                });
+
+                // Illegal move
+                if (move === null) return 'snapback';
+
+                // Add move to history
+                moveHistory = moveHistory.slice(0, currentMoveIndex + 1);
+                moveHistory.push({
+                    move: move,
+                    fen: game.fen()
+                });
+                currentMoveIndex++;
+
+                updateDisplay();
+                updateButtons();
+            }
+
+            function onSnapEnd() {
+                board.position(game.fen());
+            }
+
+            // Update the info display
+            function updateDisplay() {
+                const moveNum = currentMoveIndex >= 0 ? currentMoveIndex + 1 : 0;
+                const totalMoves = moveHistory.length;
+
+                document.getElementById('moveNumber').textContent =
+                    totalMoves > 0 ? `${moveNum} / ${totalMoves}` : '-';
+
+                if (currentMoveIndex >= 0 && moveHistory[currentMoveIndex]) {
+                    const move = moveHistory[currentMoveIndex].move;
+                    document.getElementById('moveNotation').textContent = move.san;
+                } else {
+                    document.getElementById('moveNotation').textContent = '-';
+                }
+
+                document.getElementById('fenDisplay').textContent = game.fen();
+            }
+
+            // Update button states
+            function updateButtons() {
+                document.getElementById('startBtn').disabled = currentMoveIndex < 0;
+                document.getElementById('prevBtn').disabled = currentMoveIndex < 0;
+                document.getElementById('nextBtn').disabled = currentMoveIndex >= moveHistory.length - 1;
+                document.getElementById('endBtn').disabled = currentMoveIndex >= moveHistory.length - 1;
+            }
+
+            // Show status message
+            function showStatus(message, type = 'success') {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = message;
+                statusEl.className = `status-message ${type}`;
+                statusEl.style.display = 'block';
+
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 3000);
+            }
+
+            // Navigation functions
+            function goToStart() {
+                if (moveHistory.length === 0) return;
+
+                currentMoveIndex = -1;
+                game.reset();
+                board.position('start');
+                updateDisplay();
+                updateButtons();
+            }
+
+            function previousMove() {
+                if (currentMoveIndex < 0) return;
+
+                currentMoveIndex--;
+
+                if (currentMoveIndex < 0) {
+                    game.reset();
+                    board.position('start');
+                } else {
+                    game.load(moveHistory[currentMoveIndex].fen);
+                    board.position(moveHistory[currentMoveIndex].fen);
+                }
+
+                updateDisplay();
+                updateButtons();
+            }
+
+            function nextMove() {
+                if (currentMoveIndex >= moveHistory.length - 1) return;
+
+                currentMoveIndex++;
+                game.load(moveHistory[currentMoveIndex].fen);
+                board.position(moveHistory[currentMoveIndex].fen);
+
+                updateDisplay();
+                updateButtons();
+            }
+
+            function goToEnd() {
+                if (moveHistory.length === 0) return;
+
+                currentMoveIndex = moveHistory.length - 1;
+                game.load(moveHistory[currentMoveIndex].fen);
+                board.position(moveHistory[currentMoveIndex].fen);
+
+                updateDisplay();
+                updateButtons();
+            }
+
+            function flipBoard() {
+                board.flip();
+            }
+
+            function resetBoard() {
+                game.reset();
+                board.start();
+                moveHistory = [];
+                currentMoveIndex = -1;
+                updateDisplay();
+                updateButtons();
+                showStatus('Board reset to starting position');
+            }
+
+            // Public API: Set position from FEN string
+            function setPosition(fen) {
+                try {
+                    const tempGame = new Chess();
+                    if (!tempGame.load(fen)) {
+                        throw new Error('Invalid FEN');
+                    }
+
+                    game.load(fen);
+                    board.position(fen);
+                    moveHistory = [];
+                    currentMoveIndex = -1;
+                    updateDisplay();
+                    updateButtons();
+                    showStatus('Position set successfully');
+                    return true;
+                } catch (e) {
+                    showStatus('Invalid FEN string: ' + e.message, 'error');
+                    return false;
+                }
+            }
+
+            // Public API: Make a move programmatically
+            function makeMove(from, to, promotion = 'q') {
+                try {
+                    const move = game.move({
+                        from: from,
+                        to: to,
+                        promotion: promotion
+                    });
+
+                    if (move === null) {
+                        throw new Error('Illegal move');
+                    }
+
+                    board.position(game.fen());
+
+                    // Add to history
+                    moveHistory = moveHistory.slice(0, currentMoveIndex + 1);
+                    moveHistory.push({
+                        move: move,
+                        fen: game.fen()
+                    });
+                    currentMoveIndex++;
+
+                    updateDisplay();
+                    updateButtons();
+                    return move;
+                } catch (e) {
+                    showStatus('Invalid move: ' + e.message, 'error');
+                    return null;
+                }
+            }
+
+            // Public API: Load PGN from string
+            function loadPGN(pgnString) {
+                try {
+                    const tempGame = new Chess();
+                    if (!tempGame.load_pgn(pgnString)) {
+                        throw new Error('Invalid PGN');
+                    }
+
+                    // Reset everything
+                    game.reset();
+                    moveHistory = [];
+                    currentMoveIndex = -1;
+
+                    // Parse the PGN and build move history
+                    const moves = tempGame.history({ verbose: true });
+                    game.reset();
+
+                    for (let i = 0; i < moves.length; i++) {
+                        const move = game.move(moves[i].san);
+                        moveHistory.push({
+                            move: move,
+                            fen: game.fen()
+                        });
+                    }
+
+                    // Go to start position
+                    game.reset();
+                    board.start();
+                    currentMoveIndex = -1;
+
+                    updateDisplay();
+                    updateButtons();
+                    showStatus(`PGN loaded successfully (${moveHistory.length} moves)`);
+                    return true;
+                } catch (e) {
+                    showStatus('Failed to load PGN: ' + e.message, 'error');
+                    return false;
+                }
+            }
+
+            // Handle file input
+            function handleFileSelect(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const pgnText = e.target.result;
+                    loadPGN(pgnText);
+                };
+                reader.readAsText(file);
+
+                // Reset the file input so the same file can be loaded again
+                event.target.value = '';
+            }
+
+            // Public interface
+            return {
+                init: init,
+                setPosition: setPosition,
+                makeMove: makeMove,
+                loadPGN: loadPGN,
+                goToStart: goToStart,
+                previousMove: previousMove,
+                nextMove: nextMove,
+                goToEnd: goToEnd,
+                flipBoard: flipBoard,
+                resetBoard: resetBoard,
+                handleFileSelect: handleFileSelect
+            };
+        })();
+
+        // Initialize when page loads
+        $(document).ready(function() {
+            chessBoard.init();
+
+            // Set up file input handler
+            document.getElementById('pgnFileInput').addEventListener('change', chessBoard.handleFileSelect);
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    chessBoard.previousMove();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    chessBoard.nextMove();
+                    break;
+                case 'Home':
+                    e.preventDefault();
+                    chessBoard.goToStart();
+                    break;
+                case 'End':
+                    e.preventDefault();
+                    chessBoard.goToEnd();
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -150,4 +150,39 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-009] ELO Range 1350-2800 for Play Mode
+**Date:** 2025-01-23
+**Status:** Accepted
+**Context:** Stockfish UCI_Elo has minimum value determined by version/build.
+**Decision:** Support ELO range 1350-2800 (based on installed Stockfish version)
+**Rationale:**
+- Installed Stockfish minimum UCI_Elo is 1350, not 800 as originally planned
+- 1350-2800 still covers intermediate to grandmaster level
+- Use Stockfish's built-in UCI_LimitStrength feature
+**Consequences:**
+- No beginner level below 1350
+- May need alternative weakening strategy for true beginners (future)
+- Frontend UI adjusted to reflect actual range
+
+---
+
+### [DECISION-010] Frontend Manages Game State (Stateless Backend)
+**Date:** 2025-01-23
+**Status:** Accepted
+**Context:** Need to decide where game state lives for play-vs-coach mode.
+**Decision:** Frontend manages all game state; backend remains stateless
+**Rationale:**
+- Simpler backend architecture
+- No session management needed
+- Frontend already has chess.js for move validation
+- Easier to scale backend (no state to sync)
+- Fits well with current architecture
+**Consequences:**
+- Frontend tracks: current position, move history, whose turn, player color
+- Backend only provides: analysis, engine moves (stateless requests)
+- Cannot resume games after page refresh (acceptable for MVP)
+- May add database persistence later for game history
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

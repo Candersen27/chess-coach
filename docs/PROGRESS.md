@@ -124,4 +124,47 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 03 - 2025-01-23 (Documentation + Play vs Coach)
+
+**Goal:** Part A - Documentation cleanup, Part B - Play vs coach mode
+**Duration:** ~2 hours
+**Outcome:** Success
+
+### Accomplished
+**Part A - Documentation Cleanup:**
+- Created project-wide docs/DECISIONS.md (consolidated from session-01)
+- Created project-wide docs/PROGRESS.md (session summaries)
+- Created docs/ARCHITECTURE.md (system overview, updated for current state)
+- Removed old session-01/CLAUDE_CODE_CONTEXT.md and duplicate files
+- Added Session 02 decisions (DECISION-005 through DECISION-008)
+
+**Part B - Play vs Coach Mode:**
+- Added `get_move(fen, elo)` method to engine.py with UCI_LimitStrength
+- Created POST /api/move endpoint for engine moves
+- Added "Play vs Coach" UI panel with ELO selector (1350-2800)
+- Implemented "New Game as White/Black" buttons
+- Full game flow: player moves → coach responds → game over detection
+- Integrated play mode with existing navigation (doesn't interfere)
+- Status display (your turn / coach thinking / game over)
+
+### Issues Encountered
+- Stockfish minimum UCI_Elo is 1350 (not 800 as documented)
+  - Adjusted range to 1350-2800 based on actual Stockfish version
+  - Updated frontend and backend to reflect correct range
+- Needed to integrate play mode with existing onDrop/onDragStart handlers
+  - Solution: Check isPlaying flag and route to appropriate logic
+
+### Key Learnings
+- Stockfish UCI_Elo range varies by version/build
+- Frontend state management works well for single-user game sessions
+- Separating play mode from analysis mode in UI keeps both features clean
+- chess.js has good game-over detection methods (checkmate, stalemate, etc.)
+
+### Next Session
+- Full game analysis (analyze all moves in a PGN)
+- Move-by-move evaluation display
+- Blunder detection
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

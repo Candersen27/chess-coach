@@ -72,6 +72,19 @@ class HealthResponse(BaseModel):
     engine: str = Field(..., description="Chess engine name")
 
 
+class MoveRequest(BaseModel):
+    """Request model for getting engine move."""
+    fen: str = Field(..., description="FEN string of the current position")
+    elo: int = Field(default=1500, ge=1350, le=2800, description="Engine ELO strength (1350-2800)")
+
+
+class MoveResponse(BaseModel):
+    """Response model for engine move."""
+    move: str = Field(..., description="Move in UCI notation (e.g., 'e2e4')")
+    move_san: str = Field(..., description="Move in SAN notation (e.g., 'e4')")
+    fen_after: str = Field(..., description="FEN string after the move is applied")
+
+
 # Endpoints
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -117,6 +130,37 @@ async def analyze_position(request: AnalysisRequest):
     except Exception as e:
         # Engine or other errors
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+
+@app.post("/api/move", response_model=MoveResponse)
+async def get_engine_move(request: MoveRequest):
+    """Get engine's move for a position at specified ELO level.
+
+    Args:
+        request: Move request containing FEN and ELO
+
+    Returns:
+        Engine's move in UCI and SAN notation, plus resulting FEN
+
+    Raises:
+        HTTPException: 400 for invalid FEN or game over, 500 for engine errors
+    """
+    try:
+        result = await chess_engine.get_move(request.fen, request.elo)
+
+        return {
+            "move": result["move"],
+            "move_san": result["move_san"],
+            "fen_after": result["fen_after"]
+        }
+
+    except ValueError as e:
+        # Invalid FEN or game over
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        # Engine or other errors
+        raise HTTPException(status_code=500, detail=f"Move generation failed: {str(e)}")
 
 
 if __name__ == "__main__":

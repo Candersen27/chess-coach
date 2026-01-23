@@ -213,6 +213,84 @@
         button.analyze-btn:disabled {
             background-color: #cccccc;
         }
+
+        .play-panel {
+            background-color: #f0f7ff;
+            border: 2px solid #1976D2;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .play-panel h3 {
+            margin-top: 0;
+            color: #1565C0;
+            font-size: 16px;
+        }
+
+        .elo-selector {
+            margin: 15px 0;
+        }
+
+        .elo-selector label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .elo-selector select {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        .play-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .play-buttons button {
+            flex: 1;
+            background-color: #1976D2;
+        }
+
+        .play-buttons button:hover {
+            background-color: #1565C0;
+        }
+
+        .game-status {
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .game-status.visible {
+            display: block;
+        }
+
+        .game-status.your-turn {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .game-status.coach-thinking {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .game-status.game-over {
+            background-color: #f8d7da;
+            color: #721c24;
+            font-size: 18px;
+        }
     </style>
 </head>
 <body>
@@ -243,6 +321,31 @@
             <div id="analysisContent">
                 <div class="loading">Analyzing...</div>
             </div>
+        </div>
+
+        <div id="playPanel" class="play-panel">
+            <h3>Play vs Coach</h3>
+
+            <div class="elo-selector">
+                <label for="eloSelect">Coach Strength:</label>
+                <select id="eloSelect">
+                    <option value="1350">Beginner (1350)</option>
+                    <option value="1500" selected>Intermediate (1500)</option>
+                    <option value="1700">Advanced (1700)</option>
+                    <option value="1900">Strong (1900)</option>
+                    <option value="2100">Expert (2100)</option>
+                    <option value="2300">Master (2300)</option>
+                    <option value="2500">Grandmaster (2500)</option>
+                    <option value="2800">Maximum (2800)</option>
+                </select>
+            </div>
+
+            <div class="play-buttons">
+                <button onclick="startGameAsWhite()">New Game as White</button>
+                <button onclick="startGameAsBlack()">New Game as Black</button>
+            </div>
+
+            <div id="gameStatus" class="game-status"></div>
         </div>
 
         <div class="controls">
@@ -295,6 +398,17 @@
 
             // Prevent dragging pieces when stepping through history
             function onDragStart(source, piece, position, orientation) {
+                // In play mode: only allow dragging on player's turn
+                if (typeof isPlaying !== 'undefined' && isPlaying) {
+                    if (!isPlayerTurn) return false;
+
+                    // Only allow player to move their own pieces
+                    if (playerColor === 'white' && piece.search(/^b/) !== -1) return false;
+                    if (playerColor === 'black' && piece.search(/^w/) !== -1) return false;
+
+                    return true;
+                }
+
                 // Only allow dragging if we're at the current position (end of history)
                 if (currentMoveIndex < moveHistory.length - 1) {
                     return false;
@@ -311,7 +425,12 @@
             }
 
             function onDrop(source, target) {
-                // Try to make the move
+                // Check if in play mode - use global onDropPiece function
+                if (typeof isPlaying !== 'undefined' && isPlaying) {
+                    return onDropPiece(source, target);
+                }
+
+                // Normal mode: Try to make the move
                 const move = game.move({
                     from: source,
                     to: target,
@@ -704,6 +823,147 @@
             `;
 
             analysisContent.innerHTML = html;
+        }
+
+        // Play vs Coach Mode
+        let isPlaying = false;
+        let playerColor = null;  // 'white' or 'black'
+        let isPlayerTurn = false;
+
+        function startGameAsWhite() {
+            // Reset game
+            chessBoard.resetBoard();
+            isPlaying = true;
+            playerColor = 'white';
+            isPlayerTurn = true;
+
+            updateGameStatus("Your turn (White)");
+            showStatus('New game started - You are White');
+
+            // Hide analysis panel
+            document.getElementById('analysisPanel').classList.remove('visible');
+        }
+
+        function startGameAsBlack() {
+            // Reset game
+            chessBoard.resetBoard();
+            isPlaying = true;
+            playerColor = 'black';
+            isPlayerTurn = false;
+
+            updateGameStatus("Coach thinking...");
+            showStatus('New game started - You are Black');
+
+            // Hide analysis panel
+            document.getElementById('analysisPanel').classList.remove('visible');
+
+            // Coach (White) makes first move
+            setTimeout(() => requestCoachMove(), 500);
+        }
+
+        async function requestCoachMove() {
+            if (!isPlaying) return;
+
+            const fen = chessBoard.getCurrentFEN();
+            const elo = parseInt(document.getElementById('eloSelect').value);
+
+            updateGameStatus("Coach thinking...", "coach-thinking");
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/move`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ fen, elo })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Failed to get coach move');
+                }
+
+                const data = await response.json();
+
+                // Apply coach's move
+                const move = data.move;
+                const from = move.substring(0, 2);
+                const to = move.substring(2, 4);
+                const promotion = move.length > 4 ? move[4] : 'q';
+
+                chessBoard.makeMove(from, to, promotion);
+
+                // Check if game is over
+                const gameResult = checkGameOver();
+                if (gameResult) {
+                    endGame(gameResult);
+                } else {
+                    isPlayerTurn = true;
+                    updateGameStatus(`Your turn (${playerColor === 'white' ? 'White' : 'Black'})`, "your-turn");
+                }
+
+            } catch (error) {
+                updateGameStatus("Error: " + error.message, "game-over");
+                isPlaying = false;
+            }
+        }
+
+        function onDropPiece(source, target) {
+            // Only allow moves when it's player's turn in play mode
+            if (isPlaying && !isPlayerTurn) {
+                return 'snapback';
+            }
+
+            // Try to make the move
+            const move = chessBoard.makeMove(source, target);
+
+            if (move === null && isPlaying) {
+                return 'snapback';
+            }
+
+            if (isPlaying && move !== null) {
+                isPlayerTurn = false;
+
+                // Check if game is over
+                const gameResult = checkGameOver();
+                if (gameResult) {
+                    endGame(gameResult);
+                } else {
+                    // Request coach's move
+                    setTimeout(() => requestCoachMove(), 500);
+                }
+            }
+        }
+
+        function checkGameOver() {
+            const fen = chessBoard.getCurrentFEN();
+            const game = new Chess(fen);
+
+            if (game.in_checkmate()) {
+                // Whoever just moved wins (it's now the other player's turn)
+                const winner = game.turn() === 'w' ? 'Black' : 'White';
+                return `Checkmate! ${winner} wins!`;
+            } else if (game.in_stalemate()) {
+                return 'Stalemate! Draw.';
+            } else if (game.in_threefold_repetition()) {
+                return 'Draw by threefold repetition.';
+            } else if (game.in_draw()) {
+                return 'Draw!';
+            }
+
+            return null;
+        }
+
+        function endGame(result) {
+            isPlaying = false;
+            isPlayerTurn = false;
+            updateGameStatus(result, "game-over");
+        }
+
+        function updateGameStatus(message, className = "your-turn") {
+            const statusDiv = document.getElementById('gameStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `game-status visible ${className}`;
         }
     </script>
 </body>

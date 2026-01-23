@@ -97,3 +97,60 @@ class ChessEngine:
             "best_move_san": best_move_san,
             "depth": depth
         }
+
+    async def get_move(self, fen: str, elo: int = 1500) -> Dict[str, Any]:
+        """Get engine's move at specified ELO level.
+
+        Args:
+            fen: FEN string representing the position
+            elo: Target ELO strength (1350-2800, default: 1500)
+
+        Returns:
+            Dictionary containing:
+                - move: UCI format (e.g., "e7e5")
+                - move_san: Standard algebraic notation (e.g., "e5")
+                - fen_after: FEN string after move is applied
+
+        Raises:
+            ValueError: If FEN is invalid or game is over
+            RuntimeError: If engine is not started
+        """
+        if self.engine is None:
+            raise RuntimeError("Engine not started. Call start() first.")
+
+        # Clamp ELO to valid range (1350-2800 for this Stockfish version)
+        elo = max(1350, min(2800, elo))
+
+        try:
+            # Parse FEN and create board
+            board = chess.Board(fen)
+        except ValueError as e:
+            raise ValueError(f"Invalid FEN: {str(e)}")
+
+        # Check if game is already over
+        if board.is_game_over():
+            raise ValueError("Game is already over (checkmate, stalemate, or insufficient material)")
+
+        # Configure engine strength
+        await self.engine.configure({
+            "UCI_LimitStrength": True,
+            "UCI_Elo": elo
+        })
+
+        # Get engine's move (1 second time limit)
+        result = await self.engine.play(
+            board,
+            chess.engine.Limit(time=1.0)
+        )
+
+        # Apply move to board to get FEN after move
+        move_uci = result.move.uci()
+        move_san = board.san(result.move)
+        board.push(result.move)
+        fen_after = board.fen()
+
+        return {
+            "move": move_uci,
+            "move_san": move_san,
+            "fen_after": fen_after
+        }

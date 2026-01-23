@@ -905,6 +905,10 @@
                 return game.fen();
             }
 
+            function getPGN() {
+                return game.pgn();
+            }
+
             // Public interface
             return {
                 init: init,
@@ -918,7 +922,8 @@
                 flipBoard: flipBoard,
                 resetBoard: resetBoard,
                 handleFileSelect: handleFileSelect,
-                getCurrentFEN: getCurrentFEN
+                getCurrentFEN: getCurrentFEN,
+                getPGN: getPGN
             };
         })();
 

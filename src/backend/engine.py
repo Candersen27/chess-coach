@@ -255,12 +255,13 @@ class ChessEngine:
                 continue
 
             # Calculate centipawn loss from the moving player's perspective
-            # For white: eval_before should be from white's view, eval_after should be negated
-            # For black: eval_before should be negated, eval_after should be from white's view
+            # Both evaluations are from White's perspective (always)
+            # For White: cp_loss = how much did White's position worsen
+            # For Black: cp_loss = how much did Black's position worsen (flip the perspective)
             if color == "white":
-                cp_loss = eval_before_cp - (-eval_after_cp)
+                cp_loss = eval_before_cp - eval_after_cp
             else:
-                cp_loss = (-eval_before_cp) - eval_after_cp
+                cp_loss = eval_after_cp - eval_before_cp
 
             # Classify the move
             classification = classify_move(cp_loss)

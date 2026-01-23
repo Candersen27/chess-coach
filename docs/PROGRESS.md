@@ -196,11 +196,37 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 - Added DECISION-012 (Simplified Accuracy Formula)
 
 ### Issues Encountered
+**During Initial Implementation:**
 - Initial centipawn loss calculation was from wrong perspective
   - Solution: Calculate CP loss from moving player's perspective (negate evals appropriately)
 - Analysis can be slow for long games (~2-4 seconds per position at depth 15)
   - Added loading indicator to improve UX
   - Future: Could add progress bar or lower default depth
+
+**Post-Implementation Bug Fixes:**
+1. **Missing getPGN() Method (commit 067dbdf)**
+   - Problem: "Analyze Full Game" button completely unresponsive
+   - Root cause: Method not exposed in chessBoard public interface
+   - Solution: Added getPGN() function and exported it
+
+2. **Incorrect Centipawn Loss Calculation (commit 47d6c1e)**
+   - Problem: Both players showing 100% accuracy
+   - Root cause: Wrong signs in formula (adding instead of subtracting)
+   - Solution: Corrected cp_loss calculation for both White and Black
+
+3. **getPGN() Returns Only Current Position (commit 83a43b9)**
+   - Problem: Full game analysis only analyzed first move
+   - Root cause: game.pgn() only knew current position, not full history
+   - Solution: Rebuild PGN from moveHistory array
+
+4. **UI Layout Requires Scrolling (commit 678da43)**
+   - Problem: User had to scroll to see all features
+   - Solution: Reorganized to side-by-side layout (board left, panels right)
+
+5. **Chessboard Invisible (commit 4911f41)**
+   - Problem: Board became tiny after layout change
+   - Root cause: Only had max-width, needed explicit dimensions
+   - Solution: Added width: 500px; height: 500px
 
 ### Key Learnings
 - Move classification thresholds (0/20/50/100 CP) align well with Chess.com standards

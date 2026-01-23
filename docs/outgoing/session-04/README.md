@@ -383,6 +383,36 @@ a6 {+0.15} 4. Ba4? {mistake. +0.15 → -0.35. Best: Bxc6} {-0.35}...
 2. Check analysis actually ran (should see accuracy percentages)
 3. Try different browser (CSS compatibility)
 
+### 100% Accuracy for Both Players
+
+**Problem:** Game analysis shows 100% accuracy for both White and Black
+
+**Solution:**
+This was a bug in earlier versions (fixed in commit 47d6c1e). If you still see this:
+1. Pull latest code from repository
+2. Refresh browser to reload JavaScript
+3. The centipawn loss calculation has been corrected
+
+### Button Completely Unresponsive
+
+**Problem:** "Analyze Full Game" button does nothing when clicked
+
+**Solution:**
+This was a bug in earlier versions (fixed in commit 067dbdf). If you still see this:
+1. Pull latest code from repository
+2. Refresh browser (F5 or Ctrl+R)
+3. The getPGN() method has been added
+
+### Chessboard Invisible or Tiny
+
+**Problem:** Chessboard is not visible or appears very small
+
+**Solution:**
+This was a bug in earlier versions (fixed in commit 4911f41). If you still see this:
+1. Pull latest code from repository
+2. Refresh browser to reload CSS
+3. The board now has explicit width and height dimensions
+
 ---
 
 ## Advanced Usage

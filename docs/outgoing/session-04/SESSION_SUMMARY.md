@@ -528,6 +528,53 @@ chess-coach/
 
 ---
 
+## Post-Implementation Bug Fixes
+
+After initial implementation, several critical bugs were discovered and fixed:
+
+### Bug #1: Missing getPGN() Method
+**Problem:** "Analyze Full Game" button completely unresponsive
+**Root Cause:** `chessBoard.getPGN()` was called but the method wasn't exposed in the public interface
+**Fix (commit 067dbdf):** Added `getPGN()` function and exported it in chessBoard's public interface
+**Impact:** Button now functional
+
+### Bug #2: Incorrect Centipawn Loss Calculation
+**Problem:** Both players showing 100% accuracy for all games
+**Root Cause:** Formula had wrong signs, was adding evaluations instead of subtracting
+```python
+# Wrong:
+cp_loss = eval_before_cp - (-eval_after_cp)  # White
+cp_loss = (-eval_before_cp) - eval_after_cp  # Black
+
+# Correct:
+cp_loss = eval_before_cp - eval_after_cp     # White
+cp_loss = eval_after_cp - eval_before_cp     # Black
+```
+**Fix (commit 47d6c1e):** Corrected the centipawn loss calculation for both colors
+**Impact:** Realistic accuracy scores now displayed (typically 70-85% for decent play)
+
+### Bug #3: getPGN() Returning Only Current Position
+**Problem:** "Analyze Full Game" only analyzed first move, "Export Plain PGN" exported only FEN
+**Root Cause:** `getPGN()` called `game.pgn()`, but `game` object was reset to starting position after loading PGN
+**Fix (commit 83a43b9):** Rebuilt full game from `moveHistory` array
+**Impact:** Full game now analyzed, complete PGN exported
+
+### Bug #4: UI Layout Required Scrolling
+**Problem:** User had to scroll to see all panels and features
+**Fix (commit 678da43):** Reorganized layout to side-by-side (board left, panels right)
+- Increased container width from 800px to 1400px
+- Board + controls in left column (550px)
+- All panels in right column (flexible width)
+**Impact:** Everything visible without scrolling
+
+### Bug #5: Chessboard Invisible After Layout Change
+**Problem:** Board became tiny/invisible after layout reorganization
+**Root Cause:** Board only had `max-width: 500px`, but chessboard.js needs explicit dimensions
+**Fix (commit 4911f41):** Added explicit `width: 500px; height: 500px`
+**Impact:** Board properly visible at full size
+
+---
+
 ## Next Steps
 
 1. **Test with Various Games**

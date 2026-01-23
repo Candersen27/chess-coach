@@ -906,7 +906,17 @@
             }
 
             function getPGN() {
-                return game.pgn();
+                // If there's no move history, return current game state
+                if (moveHistory.length === 0) {
+                    return game.pgn();
+                }
+
+                // Rebuild PGN from move history
+                const tempGame = new Chess();
+                for (let i = 0; i < moveHistory.length; i++) {
+                    tempGame.move(moveHistory[i].move.san);
+                }
+                return tempGame.pgn();
             }
 
             // Public interface

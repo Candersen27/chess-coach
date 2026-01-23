@@ -11,7 +11,7 @@
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 800px;
+            max-width: 1400px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -27,17 +27,38 @@
         h1 {
             color: #333;
             margin-top: 0;
+            text-align: center;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        .left-column {
+            flex: 0 0 550px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-column {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         #board {
-            margin: 20px auto;
+            margin: 0 auto;
             max-width: 500px;
         }
 
         .controls {
             display: flex;
             gap: 10px;
-            margin: 20px 0;
+            margin: 0;
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -485,56 +506,74 @@
 
         <div id="status" class="status-message"></div>
 
-        <div id="board"></div>
+        <div class="main-content">
+            <div class="left-column">
+                <div id="board"></div>
 
-        <div class="info-panel">
-            <div class="info-row">
-                <span class="info-label">Move:</span>
-                <span class="info-value" id="moveNumber">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Last Move:</span>
-                <span class="info-value move-display" id="moveNotation">-</span>
-            </div>
-            <div class="info-row">
-                <span class="info-label">Position:</span>
-                <span class="info-value" id="fenDisplay" style="font-size: 11px; word-break: break-all;">-</span>
-            </div>
-        </div>
-
-        <div id="analysisPanel" class="analysis-panel">
-            <h3>Position Analysis</h3>
-            <div id="analysisContent">
-                <div class="loading">Analyzing...</div>
-            </div>
-        </div>
-
-        <div id="playPanel" class="play-panel">
-            <h3>Play vs Coach</h3>
-
-            <div class="elo-selector">
-                <label for="eloSelect">Coach Strength:</label>
-                <select id="eloSelect">
-                    <option value="1350">Beginner (1350)</option>
-                    <option value="1500" selected>Intermediate (1500)</option>
-                    <option value="1700">Advanced (1700)</option>
-                    <option value="1900">Strong (1900)</option>
-                    <option value="2100">Expert (2100)</option>
-                    <option value="2300">Master (2300)</option>
-                    <option value="2500">Grandmaster (2500)</option>
-                    <option value="2800">Maximum (2800)</option>
-                </select>
+                <div class="controls">
+                    <div class="file-input-wrapper">
+                        <input type="file" id="pgnFileInput" accept=".pgn" />
+                        <label for="pgnFileInput">Load PGN</label>
+                    </div>
+                    <button id="startBtn" onclick="chessBoard.goToStart()">Start</button>
+                    <button id="prevBtn" onclick="chessBoard.previousMove()">Previous</button>
+                    <button id="nextBtn" onclick="chessBoard.nextMove()">Next</button>
+                    <button id="endBtn" onclick="chessBoard.goToEnd()">End</button>
+                    <button id="flipBtn" onclick="chessBoard.flipBoard()">Flip Board</button>
+                    <button id="resetBtn" onclick="chessBoard.resetBoard()">Reset</button>
+                    <button id="analyzeBtn" class="analyze-btn" onclick="analyzeCurrentPosition()">Analyze Position</button>
+                </div>
             </div>
 
-            <div class="play-buttons">
-                <button onclick="startGameAsWhite()">New Game as White</button>
-                <button onclick="startGameAsBlack()">New Game as Black</button>
-            </div>
+            <div class="right-column">
+                <div class="info-panel">
+                    <div class="info-row">
+                        <span class="info-label">Move:</span>
+                        <span class="info-value" id="moveNumber">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Last Move:</span>
+                        <span class="info-value move-display" id="moveNotation">-</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Position:</span>
+                        <span class="info-value" id="fenDisplay" style="font-size: 11px; word-break: break-all;">-</span>
+                    </div>
+                </div>
 
-            <div id="gameStatus" class="game-status"></div>
-        </div>
+                <div id="analysisPanel" class="analysis-panel">
+                    <h3>Position Analysis</h3>
+                    <div id="analysisContent">
+                        <div class="loading">Analyzing...</div>
+                    </div>
+                </div>
 
-        <div id="gameAnalysisPanel" class="game-analysis-panel">
+                <div id="playPanel" class="play-panel">
+                    <h3>Play vs Coach</h3>
+
+                    <div class="elo-selector">
+                        <label for="eloSelect">Coach Strength:</label>
+                        <select id="eloSelect">
+                            <option value="1350">Beginner (1350)</option>
+                            <option value="1500" selected>Intermediate (1500)</option>
+                            <option value="1700">Advanced (1700)</option>
+                            <option value="1900">Strong (1900)</option>
+                            <option value="2100">Expert (2100)</option>
+                            <option value="2300">Master (2300)</option>
+                            <option value="2500">Grandmaster (2500)</option>
+                            <option value="2800">Maximum (2800)</option>
+                        </select>
+                    </div>
+
+                    <div class="play-buttons">
+                        <button onclick="startGameAsWhite()">New Game as White</button>
+                        <button onclick="startGameAsBlack()">New Game as Black</button>
+                    </div>
+
+                    <div id="gameStatus" class="game-status"></div>
+                </div>
+
+                <div id="gameAnalysisPanel" class="game-analysis-panel">
             <h3>Game Analysis</h3>
 
             <button class="analysis-button" onclick="analyzeFullGame()" id="analyzeGameBtn">
@@ -579,19 +618,7 @@
                 </div>
             </div>
         </div>
-
-        <div class="controls">
-            <div class="file-input-wrapper">
-                <input type="file" id="pgnFileInput" accept=".pgn" />
-                <label for="pgnFileInput">Load PGN</label>
             </div>
-            <button id="startBtn" onclick="chessBoard.goToStart()">Start</button>
-            <button id="prevBtn" onclick="chessBoard.previousMove()">Previous</button>
-            <button id="nextBtn" onclick="chessBoard.nextMove()">Next</button>
-            <button id="endBtn" onclick="chessBoard.goToEnd()">End</button>
-            <button id="flipBtn" onclick="chessBoard.flipBoard()">Flip Board</button>
-            <button id="resetBtn" onclick="chessBoard.resetBoard()">Reset</button>
-            <button id="analyzeBtn" class="analyze-btn" onclick="analyzeCurrentPosition()">Analyze Position</button>
         </div>
     </div>
 

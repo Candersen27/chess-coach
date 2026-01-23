@@ -66,8 +66,9 @@ class ChessEngine:
             chess.engine.Limit(depth=depth)
         )
 
-        # Extract score (relative to side to move)
-        score = info['score'].relative
+        # Extract score from White's perspective (standard convention)
+        # Positive = White is better, Negative = Black is better
+        score = info['score'].white()
 
         # Determine evaluation type and value
         if score.is_mate():

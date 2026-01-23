@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from engine import ChessEngine
 
@@ -85,6 +85,48 @@ class MoveResponse(BaseModel):
     fen_after: str = Field(..., description="FEN string after the move is applied")
 
 
+class GameAnalysisRequest(BaseModel):
+    """Request model for full game analysis."""
+    pgn: str = Field(..., description="PGN string of the game to analyze")
+    depth: int = Field(default=15, ge=1, le=30, description="Analysis depth (1-30)")
+
+
+class MoveAnalysis(BaseModel):
+    """Analysis data for a single move."""
+    move_number: int = Field(..., description="Move number in the game")
+    color: str = Field(..., description="Color that played the move: 'white' or 'black'")
+    move_san: str = Field(..., description="Move in SAN notation (e.g., 'e4')")
+    move_uci: str = Field(..., description="Move in UCI notation (e.g., 'e2e4')")
+    fen_before: str = Field(..., description="FEN before the move")
+    fen_after: str = Field(..., description="FEN after the move")
+    eval_before: Optional[float] = Field(None, description="Evaluation before move (in pawns)")
+    eval_after: Optional[float] = Field(None, description="Evaluation after move (in pawns)")
+    eval_change: Optional[float] = Field(None, description="Change in evaluation")
+    best_move_san: str = Field(..., description="Best move in SAN notation")
+    best_move_uci: str = Field(..., description="Best move in UCI notation")
+    classification: str = Field(..., description="Move quality: excellent, good, inaccuracy, mistake, or blunder")
+
+
+class GameSummary(BaseModel):
+    """Summary statistics for the analyzed game."""
+    total_moves: int = Field(..., description="Total number of moves analyzed")
+    white_accuracy: float = Field(..., description="White's accuracy percentage")
+    black_accuracy: float = Field(..., description="Black's accuracy percentage")
+    white_blunders: int = Field(..., description="Number of blunders by White")
+    white_mistakes: int = Field(..., description="Number of mistakes by White")
+    white_inaccuracies: int = Field(..., description="Number of inaccuracies by White")
+    black_blunders: int = Field(..., description="Number of blunders by Black")
+    black_mistakes: int = Field(..., description="Number of mistakes by Black")
+    black_inaccuracies: int = Field(..., description="Number of inaccuracies by Black")
+    critical_moments: List[int] = Field(..., description="Move numbers of critical moments (blunders)")
+
+
+class GameAnalysisResponse(BaseModel):
+    """Response model for full game analysis."""
+    moves: List[MoveAnalysis] = Field(..., description="Analysis for each move")
+    summary: GameSummary = Field(..., description="Game summary statistics")
+
+
 # Endpoints
 @app.get("/api/health", response_model=HealthResponse)
 async def health_check():
@@ -161,6 +203,36 @@ async def get_engine_move(request: MoveRequest):
     except Exception as e:
         # Engine or other errors
         raise HTTPException(status_code=500, detail=f"Move generation failed: {str(e)}")
+
+
+@app.post("/api/game/analyze", response_model=GameAnalysisResponse)
+async def analyze_game(request: GameAnalysisRequest):
+    """Analyze all moves in a complete game.
+
+    Args:
+        request: Game analysis request containing PGN and depth
+
+    Returns:
+        Analysis result with move-by-move evaluations and game summary
+
+    Raises:
+        HTTPException: 400 for invalid PGN, 500 for engine errors
+    """
+    try:
+        result = await chess_engine.analyze_game(request.pgn, request.depth)
+
+        return {
+            "moves": result["moves"],
+            "summary": result["summary"]
+        }
+
+    except ValueError as e:
+        # Invalid PGN
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        # Engine or other errors
+        raise HTTPException(status_code=500, detail=f"Game analysis failed: {str(e)}")
 
 
 if __name__ == "__main__":

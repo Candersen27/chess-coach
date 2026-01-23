@@ -167,4 +167,53 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 04 - 2025-01-23 (Full Game Analysis + PGN Export)
+
+**Goal:** Build comprehensive game analysis and export functionality
+**Duration:** ~2 hours
+**Outcome:** Success
+
+### Accomplished
+**Backend:**
+- Added `analyze_game(pgn, depth)` method to engine.py
+- Implemented `classify_move(cp_loss)` helper function with standard thresholds
+- Implemented `calculate_accuracy(cp_losses)` for accuracy percentage calculation
+- Created POST /api/game/analyze endpoint with comprehensive response models
+- Move-by-move analysis with eval_before, eval_after, best_move, classification
+
+**Frontend:**
+- Added Game Analysis panel with "Analyze Full Game" button
+- Accuracy display for White/Black with percentages
+- Color-coded move list (green=excellent/good, yellow=inaccuracy, orange=mistake, red=blunder)
+- Clickable moves to jump to position on board
+- Loading state indicator during analysis
+- PGN export functionality (plain and annotated)
+- Annotated PGN includes evaluations and best moves in comments
+
+**Documentation:**
+- Created docs/BACKLOG.md for tracking polish items
+- Added DECISION-011 (Move Classification Thresholds)
+- Added DECISION-012 (Simplified Accuracy Formula)
+
+### Issues Encountered
+- Initial centipawn loss calculation was from wrong perspective
+  - Solution: Calculate CP loss from moving player's perspective (negate evals appropriately)
+- Analysis can be slow for long games (~2-4 seconds per position at depth 15)
+  - Added loading indicator to improve UX
+  - Future: Could add progress bar or lower default depth
+
+### Key Learnings
+- Move classification thresholds (0/20/50/100 CP) align well with Chess.com standards
+- Simplified linear accuracy formula is intuitive and good enough for MVP
+- Color-coded move lists greatly improve user experience for identifying mistakes
+- PGN annotation standard with {} comments is widely compatible
+- Centipawn loss calculation requires careful attention to perspective (White vs Black)
+
+### Next Session
+- Begin Claude API integration for coaching conversation
+- Prompt engineering for move explanations
+- Context window management for game analysis
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

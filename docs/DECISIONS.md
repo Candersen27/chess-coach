@@ -185,4 +185,40 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-011] Move Classification Thresholds
+**Date:** 2025-01-23
+**Status:** Accepted
+**Context:** Need standardized thresholds for classifying move quality based on centipawn loss.
+**Decision:** Use thresholds: Excellent (≤0 CP), Good (0-20 CP), Inaccuracy (20-50 CP), Mistake (50-100 CP), Blunder (>100 CP)
+**Rationale:**
+- Matches Chess.com and Lichess standards
+- Well-understood by chess players
+- Based on practical impact of centipawn losses
+- Provides granular feedback for different skill levels
+**Consequences:**
+- Consistent move classification across all games
+- Easy to compare analysis with other platforms
+- May be harsh for beginners (100+ CP losses are common)
+- Could adjust thresholds per skill level in future
+
+---
+
+### [DECISION-012] Simplified Accuracy Formula
+**Date:** 2025-01-23
+**Status:** Accepted
+**Context:** Need formula to convert average centipawn loss to accuracy percentage.
+**Decision:** Use simplified formula: `accuracy = max(0, min(100, 100 - (avg_cp_loss / 2)))`
+**Rationale:**
+- Simple linear relationship, easy to understand
+- Good enough for MVP - provides meaningful feedback
+- More complex Chess.com formula (`103.1668 * exp(-0.04354 * avg_loss) - 3.1668`) can be added later
+- Linear formula is more predictable for users
+**Consequences:**
+- Accuracy percentages will differ from Chess.com
+- May show higher accuracy for mediocre play than exponential formula
+- Easy to refine formula later without changing analysis infrastructure
+- Users can still compare relative performance across their own games
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

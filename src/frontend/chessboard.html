@@ -291,6 +291,152 @@
             color: #721c24;
             font-size: 18px;
         }
+
+        .game-analysis-panel {
+            background-color: #f9fdf9;
+            border: 2px solid #4CAF50;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .game-analysis-panel h3 {
+            margin-top: 0;
+            color: #2E7D32;
+            font-size: 16px;
+        }
+
+        .analysis-button {
+            background-color: #4CAF50;
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .analysis-button:hover {
+            background-color: #45a049;
+        }
+
+        .analysis-button:disabled {
+            background-color: #cccccc;
+        }
+
+        .analysis-results {
+            margin-top: 15px;
+            display: none;
+        }
+
+        .analysis-results.visible {
+            display: block;
+        }
+
+        .accuracy-display {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .accuracy-box {
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .accuracy-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+
+        .accuracy-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .mistake-counts {
+            font-size: 11px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .moves-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+        }
+
+        .move-item {
+            padding: 6px;
+            margin: 3px 0;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+
+        .move-item:hover {
+            background-color: #f5f5f5;
+        }
+
+        .move-item.excellent {
+            border-left: 3px solid #2ecc71;
+        }
+
+        .move-item.good {
+            border-left: 3px solid #27ae60;
+        }
+
+        .move-item.inaccuracy {
+            border-left: 3px solid #f1c40f;
+        }
+
+        .move-item.mistake {
+            border-left: 3px solid #e67e22;
+        }
+
+        .move-item.blunder {
+            border-left: 3px solid #e74c3c;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .export-buttons button {
+            flex: 1;
+            background-color: #2196F3;
+            font-size: 13px;
+        }
+
+        .export-buttons button:hover {
+            background-color: #0b7dda;
+        }
+
+        .loading-analysis {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .loading-analysis::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
     </style>
 </head>
 <body>
@@ -346,6 +492,40 @@
             </div>
 
             <div id="gameStatus" class="game-status"></div>
+        </div>
+
+        <div id="gameAnalysisPanel" class="game-analysis-panel">
+            <h3>Game Analysis</h3>
+
+            <button class="analysis-button" onclick="analyzeFullGame()" id="analyzeGameBtn">
+                Analyze Full Game
+            </button>
+
+            <div id="analysisResults" class="analysis-results">
+                <div class="accuracy-display">
+                    <div class="accuracy-box">
+                        <div class="accuracy-label">White Accuracy</div>
+                        <div class="accuracy-value" id="whiteAccuracy">-</div>
+                        <div class="mistake-counts" id="whiteMistakes">-</div>
+                    </div>
+                    <div class="accuracy-box">
+                        <div class="accuracy-label">Black Accuracy</div>
+                        <div class="accuracy-value" id="blackAccuracy">-</div>
+                        <div class="mistake-counts" id="blackMistakes">-</div>
+                    </div>
+                </div>
+
+                <div id="movesList" class="moves-list"></div>
+
+                <div class="export-buttons">
+                    <button onclick="exportPlainPGN()">Export Plain PGN</button>
+                    <button onclick="exportAnnotatedPGN()">Export Annotated PGN</button>
+                </div>
+            </div>
+
+            <div id="loadingAnalysis" class="loading-analysis" style="display: none;">
+                Analyzing game
+            </div>
         </div>
 
         <div class="controls">
@@ -964,6 +1144,179 @@
             const statusDiv = document.getElementById('gameStatus');
             statusDiv.textContent = message;
             statusDiv.className = `game-status visible ${className}`;
+        }
+
+        // Game Analysis Functions
+        let currentGameAnalysis = null;
+
+        async function analyzeFullGame() {
+            // Get PGN from current game
+            const pgn = chessBoard.getPGN();
+            if (!pgn || pgn.trim() === '') {
+                alert('No game loaded. Please load a PGN file or play a game first.');
+                return;
+            }
+
+            // Show loading state
+            document.getElementById('analyzeGameBtn').disabled = true;
+            document.getElementById('loadingAnalysis').style.display = 'block';
+            document.getElementById('analysisResults').classList.remove('visible');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/game/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pgn: pgn,
+                        depth: 15  // Default depth
+                    })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Analysis failed');
+                }
+
+                const analysisData = await response.json();
+                currentGameAnalysis = analysisData;
+                displayGameAnalysis(analysisData);
+
+            } catch (error) {
+                console.error('Game analysis error:', error);
+                alert(`Analysis failed: ${error.message}`);
+            } finally {
+                document.getElementById('analyzeGameBtn').disabled = false;
+                document.getElementById('loadingAnalysis').style.display = 'none';
+            }
+        }
+
+        function displayGameAnalysis(data) {
+            // Show results panel
+            document.getElementById('analysisResults').classList.add('visible');
+
+            // Display accuracy
+            document.getElementById('whiteAccuracy').textContent = data.summary.white_accuracy.toFixed(1) + '%';
+            document.getElementById('blackAccuracy').textContent = data.summary.black_accuracy.toFixed(1) + '%';
+
+            // Display mistake counts
+            document.getElementById('whiteMistakes').textContent =
+                `Blunders: ${data.summary.white_blunders} | Mistakes: ${data.summary.white_mistakes} | Inaccuracies: ${data.summary.white_inaccuracies}`;
+            document.getElementById('blackMistakes').textContent =
+                `Blunders: ${data.summary.black_blunders} | Mistakes: ${data.summary.black_mistakes} | Inaccuracies: ${data.summary.black_inaccuracies}`;
+
+            // Build moves list
+            const movesList = document.getElementById('movesList');
+            movesList.innerHTML = '';
+
+            data.moves.forEach((move, index) => {
+                const moveItem = document.createElement('div');
+                moveItem.className = `move-item ${move.classification}`;
+
+                const moveText = move.color === 'white'
+                    ? `${move.move_number}. ${move.move_san}`
+                    : `${move.move_number}... ${move.move_san}`;
+
+                const evalText = move.eval_after !== null
+                    ? ` (${move.eval_after > 0 ? '+' : ''}${move.eval_after.toFixed(2)})`
+                    : '';
+
+                moveItem.textContent = `${moveText}${evalText} - ${move.classification}`;
+
+                // Make clickable to jump to position
+                moveItem.onclick = () => {
+                    chessBoard.setPosition(move.fen_after);
+                };
+
+                // Add tooltip with best move for non-excellent moves
+                if (move.classification !== 'excellent' && move.classification !== 'good') {
+                    moveItem.title = `Best: ${move.best_move_san} (eval change: ${move.eval_change.toFixed(2)})`;
+                }
+
+                movesList.appendChild(moveItem);
+            });
+        }
+
+        function exportPlainPGN() {
+            const pgn = chessBoard.getPGN();
+            if (!pgn || pgn.trim() === '') {
+                alert('No game to export. Please load a PGN file or play a game first.');
+                return;
+            }
+
+            const filename = `game_${new Date().toISOString().slice(0, 10)}.pgn`;
+            downloadPGN(pgn, filename);
+        }
+
+        function exportAnnotatedPGN() {
+            if (!currentGameAnalysis || !currentGameAnalysis.moves) {
+                alert('Please analyze the game first before exporting annotated PGN.');
+                return;
+            }
+
+            const pgn = generateAnnotatedPGN(currentGameAnalysis.moves);
+            const filename = `game_annotated_${new Date().toISOString().slice(0, 10)}.pgn`;
+            downloadPGN(pgn, filename);
+        }
+
+        function generateAnnotatedPGN(moves) {
+            let pgn = '';
+            let moveNumber = 1;
+
+            for (let i = 0; i < moves.length; i++) {
+                const move = moves[i];
+
+                // Add move number for white's move
+                if (move.color === 'white') {
+                    pgn += `${moveNumber}. `;
+                }
+
+                // Add the move
+                pgn += move.move_san;
+
+                // Add annotation based on classification
+                if (move.classification === 'blunder') {
+                    pgn += '??';
+                } else if (move.classification === 'mistake') {
+                    pgn += '?';
+                } else if (move.classification === 'inaccuracy') {
+                    pgn += '?!';
+                } else if (move.classification === 'excellent') {
+                    pgn += '!';
+                }
+
+                // Add evaluation and best move comment for non-good moves
+                if (['blunder', 'mistake', 'inaccuracy'].includes(move.classification)) {
+                    const evalBefore = move.eval_before !== null ? move.eval_before.toFixed(2) : '?';
+                    const evalAfter = move.eval_after !== null ? move.eval_after.toFixed(2) : '?';
+                    pgn += ` {${move.classification}. ${evalBefore} → ${evalAfter}. Best: ${move.best_move_san}}`;
+                } else {
+                    const evalAfter = move.eval_after !== null ? move.eval_after.toFixed(2) : '?';
+                    pgn += ` {${evalAfter > 0 ? '+' : ''}${evalAfter}}`;
+                }
+
+                pgn += ' ';
+
+                // Increment move number after black's move
+                if (move.color === 'black') {
+                    moveNumber++;
+                }
+            }
+
+            return pgn.trim();
+        }
+
+        function downloadPGN(content, filename) {
+            const blob = new Blob([content], { type: 'application/x-chess-pgn' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
     </script>
 </body>

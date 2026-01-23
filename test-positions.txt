@@ -1,0 +1,39 @@
+Test Positions for Chess Coach
+================================
+
+1. MATE IN 1 (White to move):
+   FEN: k7/8/1K6/8/8/8/8/7R w - - 0 1
+   Expected: M1, Best move: Rh8#
+
+   To test in frontend:
+   - Open browser console (F12)
+   - Run: chessBoard.setPosition('k7/8/1K6/8/8/8/8/7R w - - 0 1')
+   - Click "Analyze Position"
+   - Should show "M1" in green and "Rh8#"
+
+2. COMPLEX MIDDLEGAME:
+   FEN: r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4
+   Expected: Large positive evaluation (Scholar's mate threat)
+
+   To test:
+   - Run: chessBoard.setPosition('r1bqkb1r/pppp1ppp/2n2n2/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4')
+   - Click "Analyze Position"
+   - Should show large positive evaluation
+
+3. EQUAL ENDGAME:
+   FEN: 8/5k2/8/8/8/8/5K2/8 w - - 0 1
+   Expected: 0.00 (dead draw)
+
+   To test:
+   - Run: chessBoard.setPosition('8/5k2/8/8/8/8/5K2/8 w - - 0 1')
+   - Click "Analyze Position"
+   - Should show "0.00" in gray
+
+4. BLACK WINNING:
+   FEN: rnb1kbnr/pppp1ppp/4p3/8/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 1
+   Expected: Large negative evaluation
+
+   To test:
+   - Run: chessBoard.setPosition('rnb1kbnr/pppp1ppp/4p3/8/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 0 1')
+   - Click "Analyze Position"
+   - Should show negative value in red

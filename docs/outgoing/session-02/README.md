@@ -90,7 +90,14 @@ Analyze a chess position.
 
 **Evaluation Types:**
 - `"cp"` - Centipawn evaluation (in pawn units, e.g., 0.35 = +35 centipawns)
+  - **Positive values** = White is better (e.g., +0.35)
+  - **Negative values** = Black is better (e.g., -0.42)
+  - **Zero** = Equal position
 - `"mate"` - Forced mate (value = moves to mate)
+  - **Positive values** = White can force mate (e.g., 3 = mate in 3)
+  - **Negative values** = Black can force mate (e.g., -1 = mate in 1)
+
+**Convention:** All evaluations are from White's perspective, regardless of whose turn it is to move. This follows the standard used by Chess.com, Lichess, and major chess platforms.
 
 **Error Responses:**
 - `400` - Invalid FEN string
@@ -156,7 +163,7 @@ app = FastAPI(lifespan=lifespan)
 
 ### Evaluation Formatting
 
-Frontend formats evaluations based on type:
+Frontend formats evaluations based on type (always from White's perspective):
 
 **Centipawn:**
 - Positive: "+0.42" (green) - White advantage
@@ -164,8 +171,8 @@ Frontend formats evaluations based on type:
 - Zero: "0.00" (gray) - Equal position
 
 **Mate:**
-- Positive: "M3" (green) - Mate in 3 for side to move
-- Negative: "M-2" (red) - Mated in 2 moves
+- Positive: "M3" (green) - White mates in 3 moves
+- Negative: "M-2" (red) - Black mates in 2 moves
 
 ### CORS Configuration
 

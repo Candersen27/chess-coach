@@ -63,10 +63,11 @@ Enhanced the existing chessboard with analysis capabilities:
 5. Results formatted and displayed with color coding
 6. Errors handled gracefully with helpful messages
 
-**Evaluation Display:**
-- Centipawn: "+0.35" (white advantage), "-0.42" (black advantage), "0.00" (equal)
-- Mate: "M3" (mate in 3 for white), "M-2" (mate in 2 for black)
-- Color coded: green (positive), red (negative), gray (neutral)
+**Evaluation Display (White's Perspective):**
+- Centipawn: "+0.35" (White advantage), "-0.42" (Black advantage), "0.00" (equal)
+- Mate: "M3" (White mates in 3), "M-2" (Black mates in 2)
+- Color coded: green (positive/White better), red (negative/Black better), gray (neutral)
+- **Convention:** Always from White's perspective, regardless of whose turn it is to move
 
 ---
 
@@ -145,6 +146,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+```
+
+### Challenge 4: Evaluation Perspective Convention
+
+**Problem:** Initially used `.relative` which gives evaluation from the side-to-move's perspective. This is non-standard and confusing (positive would mean different things depending on whose turn it is).
+
+**Solution:** Changed to `.white()` to follow standard chess convention:
+- **Positive (+)** = White is better
+- **Negative (−)** = Black is better
+- Always from White's perspective, regardless of whose turn it is
+
+This matches the convention used by Chess.com, Lichess, and all major chess platforms.
+
+**Code:**
+```python
+# Standard convention: always from White's perspective
+score = info['score'].white()
 ```
 
 ---

@@ -136,6 +136,83 @@
             border: 1px solid #f5c6cb;
             color: #721c24;
         }
+
+        .analysis-panel {
+            background-color: #e8f4f8;
+            border: 2px solid #2196F3;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .analysis-panel.visible {
+            display: block;
+        }
+
+        .analysis-panel h3 {
+            margin-top: 0;
+            color: #1976D2;
+            font-size: 16px;
+        }
+
+        .evaluation-display {
+            font-size: 32px;
+            font-weight: bold;
+            text-align: center;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            background-color: white;
+        }
+
+        .evaluation-display.positive {
+            color: #2e7d32;
+        }
+
+        .evaluation-display.negative {
+            color: #c62828;
+        }
+
+        .evaluation-display.neutral {
+            color: #666;
+        }
+
+        .best-move-display {
+            text-align: center;
+            font-size: 18px;
+            margin: 10px 0;
+        }
+
+        .best-move-display .label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .best-move-display .move {
+            color: #1976D2;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .loading {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+
+        button.analyze-btn {
+            background-color: #FF9800;
+        }
+
+        button.analyze-btn:hover {
+            background-color: #F57C00;
+        }
+
+        button.analyze-btn:disabled {
+            background-color: #cccccc;
+        }
     </style>
 </head>
 <body>
@@ -161,6 +238,13 @@
             </div>
         </div>
 
+        <div id="analysisPanel" class="analysis-panel">
+            <h3>Position Analysis</h3>
+            <div id="analysisContent">
+                <div class="loading">Analyzing...</div>
+            </div>
+        </div>
+
         <div class="controls">
             <div class="file-input-wrapper">
                 <input type="file" id="pgnFileInput" accept=".pgn" />
@@ -172,6 +256,7 @@
             <button id="endBtn" onclick="chessBoard.goToEnd()">End</button>
             <button id="flipBtn" onclick="chessBoard.flipBoard()">Flip Board</button>
             <button id="resetBtn" onclick="chessBoard.resetBoard()">Reset</button>
+            <button id="analyzeBtn" class="analyze-btn" onclick="analyzeCurrentPosition()">Analyze Position</button>
         </div>
     </div>
 
@@ -464,6 +549,11 @@
                 event.target.value = '';
             }
 
+            // Get current FEN
+            function getCurrentFEN() {
+                return game.fen();
+            }
+
             // Public interface
             return {
                 init: init,
@@ -476,7 +566,8 @@
                 goToEnd: goToEnd,
                 flipBoard: flipBoard,
                 resetBoard: resetBoard,
-                handleFileSelect: handleFileSelect
+                handleFileSelect: handleFileSelect,
+                getCurrentFEN: getCurrentFEN
             };
         })();
 
@@ -509,6 +600,111 @@
                     break;
             }
         });
+
+        // Position Analysis Functions
+        const API_BASE_URL = 'http://localhost:8000';
+
+        async function analyzeCurrentPosition() {
+            const analysisPanel = document.getElementById('analysisPanel');
+            const analysisContent = document.getElementById('analysisContent');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+
+            // Get current FEN
+            const fen = chessBoard.getCurrentFEN();
+
+            // Show analysis panel with loading state
+            analysisPanel.classList.add('visible');
+            analysisContent.innerHTML = '<div class="loading">Analyzing position...</div>';
+            analyzeBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fen: fen,
+                        depth: 15
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Analysis failed');
+                }
+
+                const data = await response.json();
+                displayAnalysis(data);
+
+            } catch (error) {
+                analysisContent.innerHTML = `
+                    <div class="error" style="color: #c62828; text-align: center;">
+                        <strong>Error:</strong> ${error.message}
+                        <br><small>Make sure the backend server is running on port 8000</small>
+                    </div>
+                `;
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        function displayAnalysis(data) {
+            const analysisContent = document.getElementById('analysisContent');
+            const { evaluation, best_move_san } = data;
+
+            // Format evaluation
+            let evalText = '';
+            let evalClass = 'neutral';
+
+            if (evaluation.type === 'mate') {
+                const mateValue = evaluation.value;
+                if (mateValue > 0) {
+                    evalText = `M${Math.abs(mateValue)}`;
+                    evalClass = 'positive';
+                } else {
+                    evalText = `M-${Math.abs(mateValue)}`;
+                    evalClass = 'negative';
+                }
+            } else {
+                // Centipawn evaluation
+                const cpValue = evaluation.value;
+                if (cpValue > 0) {
+                    evalText = `+${cpValue.toFixed(2)}`;
+                    evalClass = 'positive';
+                } else if (cpValue < 0) {
+                    evalText = cpValue.toFixed(2);
+                    evalClass = 'negative';
+                } else {
+                    evalText = '0.00';
+                    evalClass = 'neutral';
+                }
+            }
+
+            // Build HTML
+            let html = `
+                <div class="evaluation-display ${evalClass}">
+                    ${evalText}
+                </div>
+            `;
+
+            if (best_move_san) {
+                html += `
+                    <div class="best-move-display">
+                        <span class="label">Best move:</span>
+                        <span class="move">${best_move_san}</span>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div style="text-align: center; margin-top: 10px; font-size: 12px; color: #666;">
+                    Depth: ${data.depth}
+                </div>
+            `;
+
+            analysisContent.innerHTML = html;
+        }
     </script>
 </body>
 </html>

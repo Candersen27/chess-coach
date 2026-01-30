@@ -242,4 +242,83 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 04.5 - 2025-01-26 (PROJECT_WALKTHROUGH.md Creation)
+
+**Goal:** Create comprehensive narrative documentation for the project
+**Duration:** ~1 hour
+**Outcome:** Success
+
+### Accomplished
+- Created PROJECT_WALKTHROUGH.md at project root
+  - 13 sections covering all aspects of the project
+  - Narrative tone with analogies (restaurant kitchen, notes under door)
+  - Detailed explanation of frontend/backend architecture
+  - Analysis and play mode data flows
+  - All 7 bugs documented as learning experiences
+  - Reusable patterns extracted
+  - Engineering principles articulated
+  - Vision for Phase 2+ outlined
+  - Quick reference section
+- Created README.md with project overview and link to walkthrough
+- Updated PROGRESS.md with Session 04.5 summary
+
+### Key Learnings
+- Narrative documentation is more engaging than dry technical specs
+- Bugs are teaching moments, not embarrassments
+- Explaining the "why" behind decisions helps future maintenance
+- A comprehensive walkthrough serves multiple audiences (creator, interviewers, contributors)
+
+### Next Session
+- Begin Phase 2: Database integration for player profiles
+- Or: Claude API integration for natural language coaching
+
+---
+
+## Session 05 - 2025-01-30 (Claude API + Chat Interface)
+
+**Goal:** Integrate Claude API for coaching conversations with minimal chat UI
+**Duration:** ~1.5 hours
+**Outcome:** Success
+
+### Accomplished
+**Backend:**
+- Created `src/backend/coach.py` — ChessCoach class with AsyncAnthropic client
+- System prompt with coaching persona (patient, Socratic, concrete, board-aware)
+- Board context injection (FEN, last move, current mode) into system prompt
+- Added `POST /api/chat` endpoint with Pydantic request/response models
+- Coach initialized in FastAPI lifespan alongside Stockfish engine
+- Graceful degradation if API key missing (engine still works, coach warns)
+- Updated requirements.txt with `anthropic` and `python-dotenv` dependencies
+
+**Frontend:**
+- Chat panel alongside board and existing panels (three-column layout)
+- Message display with user/assistant styling (blue right / gray left)
+- "Thinking..." indicator while waiting for Claude response
+- Enter-to-send and button support
+- Conversation history maintained in frontend array
+- Board context (FEN, last move, mode) sent with each message
+- Keyboard shortcuts disabled when typing in chat input
+- Initial greeting message on page load
+
+**Documentation:**
+- Added DECISION-013 (Claude Sonnet model choice)
+- Added DECISION-014 (Conversation state in frontend)
+- Added DECISION-015 (AsyncAnthropic client)
+
+### Issues Encountered
+- `.env` API key format uses quotes and spaces (`ANTHROPIC_API_KEY = "sk-..."`) — python-dotenv handles this correctly
+- Account credit balance needed for API calls to complete (API key validates, billing required)
+
+### Key Learnings
+- AsyncAnthropic matches the project's async-first pattern cleanly
+- `suggested_action` field in chat response prepares for future board control (Session 07)
+- Keeping coach initialization separate from engine means one can fail without blocking the other
+- Chat input needs to suppress keyboard shortcuts (arrows would trigger board navigation)
+
+### Next Session
+- Session 06: Lesson plan generation from coaching conversation
+- Session 07: Board integration (Claude controls coached play via lesson plan)
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

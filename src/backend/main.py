@@ -9,18 +9,26 @@ from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 
 from engine import ChessEngine
+from coach import ChessCoach
 
 
-# Global engine instance
+# Global instances
 chess_engine = ChessEngine()
+chess_coach = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifespan of the FastAPI application."""
-    # Startup: Initialize the chess engine
+    global chess_coach
+    # Startup: Initialize the chess engine and coach
     await chess_engine.start()
     print("Chess engine started successfully")
+    try:
+        chess_coach = ChessCoach()
+        print("Chess coach initialized successfully")
+    except ValueError as e:
+        print(f"Warning: Chess coach not available - {e}")
     yield
     # Shutdown: Clean up the chess engine
     await chess_engine.stop()
@@ -125,6 +133,32 @@ class GameAnalysisResponse(BaseModel):
     """Response model for full game analysis."""
     moves: List[MoveAnalysis] = Field(..., description="Analysis for each move")
     summary: GameSummary = Field(..., description="Game summary statistics")
+
+
+class BoardContext(BaseModel):
+    """Board context for chat messages."""
+    fen: Optional[str] = None
+    last_move: Optional[str] = None
+    mode: Optional[str] = None  # "analysis", "play", "idle"
+
+
+class ChatMessage(BaseModel):
+    """A single message in conversation history."""
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Request model for chat with coach."""
+    message: str
+    conversation_history: Optional[List[ChatMessage]] = []
+    board_context: Optional[BoardContext] = None
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat with coach."""
+    message: str
+    suggested_action: Optional[dict] = None
 
 
 # Endpoints
@@ -233,6 +267,37 @@ async def analyze_game(request: GameAnalysisRequest):
     except Exception as e:
         # Engine or other errors
         raise HTTPException(status_code=500, detail=f"Game analysis failed: {str(e)}")
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_with_coach(request: ChatRequest):
+    """Chat with the chess coach.
+
+    Args:
+        request: Chat request with message, conversation history, and board context
+
+    Returns:
+        Coach's response message
+
+    Raises:
+        HTTPException: 503 if coach not initialized, 500 for API errors
+    """
+    if chess_coach is None:
+        raise HTTPException(status_code=503, detail="Chess coach not available (check API key)")
+
+    try:
+        history = [{"role": m.role, "content": m.content} for m in request.conversation_history]
+        board_ctx = request.board_context.model_dump() if request.board_context else None
+
+        response = await chess_coach.chat(
+            message=request.message,
+            conversation_history=history,
+            board_context=board_ctx
+        )
+        return response
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
 if __name__ == "__main__":

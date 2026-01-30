@@ -221,4 +221,55 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-013] Claude Sonnet for Chat Model
+**Date:** 2025-01-30
+**Status:** Accepted
+**Context:** Need to choose Claude model for coaching chat. Options: Haiku (fast/cheap), Sonnet (balanced), Opus (highest quality).
+**Decision:** Use claude-sonnet-4-20250514
+**Rationale:**
+- Good balance of quality and cost for conversational coaching
+- Fast enough for chat-style interactions
+- Smart enough for chess concept explanations
+- Can upgrade to Opus for specific deep analysis later if needed
+**Consequences:**
+- ~$3/MTok input, ~$15/MTok output
+- Responses typically under 2 seconds
+- Quality sufficient for teaching concepts (not engine-level calculation)
+
+---
+
+### [DECISION-014] Conversation State in Frontend
+**Date:** 2025-01-30
+**Status:** Accepted
+**Context:** Conversation history needs to persist across messages. Options: frontend array, backend sessions, database.
+**Decision:** Frontend manages conversation history as a JavaScript array, sent with each request
+**Rationale:**
+- Simplest implementation for MVP
+- No backend session management needed
+- Consistent with DECISION-010 (frontend manages game state)
+- Stateless backend remains easy to scale
+- Full history sent each request means Claude has complete context
+**Consequences:**
+- Conversation lost on page refresh (acceptable for MVP)
+- Token usage grows with conversation length (mitigated by max_tokens)
+- Will add database persistence in Phase 3
+- No server-side conversation logging (privacy benefit for MVP)
+
+---
+
+### [DECISION-015] AsyncAnthropic Client
+**Date:** 2025-01-30
+**Status:** Accepted
+**Context:** Anthropic SDK provides both sync (Anthropic) and async (AsyncAnthropic) clients.
+**Decision:** Use AsyncAnthropic to match the project's async-first backend pattern
+**Rationale:**
+- Consistent with engine.py async patterns
+- Doesn't block the FastAPI event loop during API calls
+- Allows concurrent request handling if needed later
+**Consequences:**
+- Coach chat method is properly async
+- Consistent architecture across all backend modules
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

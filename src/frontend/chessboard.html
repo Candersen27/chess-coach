@@ -657,6 +657,234 @@
             font-size: 12px;
             font-weight: bold;
         }
+        /* Tab Bar */
+        .tab-bar {
+            display: flex;
+            gap: 0;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .tab-btn {
+            padding: 8px 16px;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: #333;
+            background: none;
+        }
+
+        .tab-btn.active {
+            color: #1976D2;
+            border-bottom-color: #1976D2;
+            font-weight: bold;
+            background: none;
+        }
+
+        /* Batch Analysis */
+        .batch-analysis-container {
+            padding: 0;
+        }
+
+        .batch-input-section {
+            margin-bottom: 20px;
+        }
+
+        .batch-input-section label {
+            display: block;
+            font-weight: bold;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        #pgn-batch-input {
+            width: 100%;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .batch-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .batch-controls .btn-primary {
+            background-color: #1976D2;
+        }
+
+        .batch-controls .btn-primary:hover {
+            background-color: #1565C0;
+        }
+
+        .batch-controls .btn-secondary {
+            background-color: #757575;
+        }
+
+        .batch-controls .btn-secondary:hover {
+            background-color: #616161;
+        }
+
+        .batch-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .batch-status.loading {
+            display: block;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .batch-status.error {
+            display: block;
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .batch-status.success {
+            display: block;
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .recommendations-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .recommendations-box h5 {
+            margin-top: 0;
+            color: #e65100;
+        }
+
+        #recommendations-list {
+            margin: 10px 0 0 0;
+            padding-left: 20px;
+        }
+
+        #recommendations-list li {
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .patterns-detail, .phase-analysis {
+            margin-bottom: 20px;
+        }
+
+        .patterns-detail h5, .phase-analysis h5 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .pattern-item {
+            background: #f5f5f5;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+
+        .pattern-item h6 {
+            margin: 0 0 8px 0;
+            color: #d32f2f;
+            font-size: 13px;
+        }
+
+        .pattern-instance {
+            font-size: 13px;
+            margin-bottom: 5px;
+            padding-left: 10px;
+            color: #555;
+        }
+
+        .phase-stat {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f5f5f5;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+
+        .phase-name {
+            font-weight: bold;
+            text-transform: capitalize;
+        }
+
+        .phase-accuracy {
+            font-size: 18px;
+            color: #1976d2;
+            font-weight: bold;
+        }
+
+        .phase-errors {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
+        }
+
+        .export-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .export-controls button {
+            background-color: #757575;
+            font-size: 13px;
+        }
+
+        .export-controls button:hover {
+            background-color: #616161;
+        }
     </style>
 </head>
 <body>
@@ -685,6 +913,12 @@
             </div>
 
             <div class="right-column">
+                <div class="tab-bar">
+                    <button class="tab-btn active" onclick="switchTab('tools')" data-tab="tools">Board Tools</button>
+                    <button class="tab-btn" onclick="switchTab('batch')" data-tab="batch">Batch Analysis</button>
+                </div>
+
+                <div id="toolsTab">
                 <div class="info-panel">
                     <div class="info-row">
                         <span class="info-label">Move:</span>
@@ -777,6 +1011,72 @@
                 </div>
             </div>
         </div>
+            </div><!-- end toolsTab -->
+
+            <div id="batchTab" style="display: none;">
+                <div class="batch-analysis-container">
+                    <h3 style="margin-top: 0; color: #1565C0;">Multi-Game Pattern Analysis</h3>
+
+                    <div class="batch-input-section">
+                        <label for="batch-username">
+                            Your username (as it appears in PGN headers)
+                        </label>
+                        <input type="text" id="batch-username"
+                            placeholder="e.g. MyChessName"
+                            style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; box-sizing: border-box; margin-bottom: 12px;">
+
+                        <label for="pgn-batch-input">
+                            Paste 5-10 games (PGN format, separated by [Event] headers)
+                        </label>
+                        <textarea
+                            id="pgn-batch-input"
+                            rows="12"
+                            placeholder="[Event &quot;Game 1&quot;]&#10;[White &quot;You&quot;]&#10;[Black &quot;Opponent&quot;]&#10;[Result &quot;0-1&quot;]&#10;&#10;1. e4 e5 2. Nf3 Nc6...&#10;&#10;[Event &quot;Game 2&quot;]&#10;1. d4 d5 2. c4 e6..."></textarea>
+
+                        <div class="batch-controls">
+                            <button id="analyze-batch-btn" class="btn-primary">Analyze Games</button>
+                            <button id="clear-batch-btn" class="btn-secondary">Clear</button>
+                        </div>
+
+                        <div id="batch-status" class="batch-status"></div>
+                    </div>
+
+                    <div id="pattern-summary" style="display: none;">
+                        <div class="summary-stats">
+                            <div class="stat-card">
+                                <span class="stat-label">Games Analyzed</span>
+                                <span class="stat-value" id="total-games">0</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label">Overall Accuracy</span>
+                                <span class="stat-value" id="overall-accuracy">0%</span>
+                            </div>
+                        </div>
+
+                        <div class="recommendations-box">
+                            <h5>Top Recommendations</h5>
+                            <ul id="recommendations-list"></ul>
+                        </div>
+
+                        <div class="patterns-detail">
+                            <h5>Tactical Patterns Found</h5>
+                            <div id="tactical-patterns"></div>
+                        </div>
+
+                        <div class="phase-analysis">
+                            <h5>Performance by Phase</h5>
+                            <div id="phase-stats"></div>
+                        </div>
+
+                        <div class="export-controls">
+                            <button id="export-analysis-btn">Export Analysis</button>
+                            <button id="import-analysis-btn">Import Analysis</button>
+                            <input type="file" id="import-file" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+            </div><!-- end batchTab -->
+
             </div>
 
             <div class="chat-column">
@@ -1149,7 +1449,8 @@
 
         // Keyboard shortcuts (skip when typing in chat input)
         document.addEventListener('keydown', function(e) {
-            if (document.activeElement && document.activeElement.id === 'chatInput') return;
+            const activeId = document.activeElement && document.activeElement.id;
+            if (activeId === 'chatInput' || activeId === 'pgn-batch-input' || activeId === 'batch-username') return;
 
             switch(e.key) {
                 case 'ArrowLeft':
@@ -1634,6 +1935,265 @@
             URL.revokeObjectURL(url);
         }
 
+        // ===== Tab Switching =====
+        function switchTab(tabName) {
+            // Toggle content
+            document.getElementById('toolsTab').style.display = tabName === 'tools' ? '' : 'none';
+            document.getElementById('batchTab').style.display = tabName === 'batch' ? '' : 'none';
+
+            // Toggle active button
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.tab === tabName);
+            });
+        }
+
+        // ===== Batch Analysis =====
+        const batchAnalysis = {
+            games: [],
+            analyzedGames: [],
+            patternSummary: null,
+            timestamp: null,
+            username: null
+        };
+
+        function loadBatchFromStorage() {
+            const stored = localStorage.getItem('chess_batch_analysis');
+            if (!stored) return;
+            try {
+                const data = JSON.parse(stored);
+                Object.assign(batchAnalysis, data);
+                if (batchAnalysis.username) {
+                    document.getElementById('batch-username').value = batchAnalysis.username;
+                }
+                if (batchAnalysis.patternSummary) {
+                    displayPatternSummary(batchAnalysis.patternSummary);
+                }
+            } catch (e) {
+                console.error('Failed to load stored batch analysis:', e);
+            }
+        }
+
+        function saveBatchToStorage() {
+            localStorage.setItem('chess_batch_analysis', JSON.stringify(batchAnalysis));
+        }
+
+        function splitPGNs(text) {
+            // Split on [Event headers — each game starts with [Event
+            const parts = text.split(/(?=\[Event\s)/);
+            return parts.map(p => p.trim()).filter(p => p.length > 0);
+        }
+
+        async function analyzeBatchGames() {
+            const textarea = document.getElementById('pgn-batch-input');
+            const pgnText = textarea.value.trim();
+
+            if (!pgnText) {
+                showBatchStatus('error', 'Please paste some games first.');
+                return;
+            }
+
+            const pgns = splitPGNs(pgnText);
+
+            if (pgns.length < 5) {
+                showBatchStatus('error', `Please provide at least 5 games (found ${pgns.length}).`);
+                return;
+            }
+
+            const username = document.getElementById('batch-username').value.trim();
+
+            showBatchStatus('loading', `Analyzing ${pgns.length} games... This may take a few minutes.`);
+            document.getElementById('analyze-batch-btn').disabled = true;
+
+            try {
+                const payload = { pgns };
+                if (username) {
+                    payload.username = username;
+                }
+
+                const response = await fetch(`${API_BASE_URL}/api/games/analyze-batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Analysis failed');
+                }
+
+                const data = await response.json();
+
+                // Update state
+                batchAnalysis.games = pgns;
+                batchAnalysis.analyzedGames = data.analyzed_games;
+                batchAnalysis.patternSummary = data.pattern_summary;
+                batchAnalysis.timestamp = new Date().toISOString();
+                batchAnalysis.username = username || null;
+
+                saveBatchToStorage();
+                displayPatternSummary(data.pattern_summary);
+                showBatchStatus('success', `Successfully analyzed ${pgns.length} games!`);
+
+            } catch (error) {
+                showBatchStatus('error', `Error: ${error.message}`);
+                console.error('Batch analysis error:', error);
+            } finally {
+                document.getElementById('analyze-batch-btn').disabled = false;
+            }
+        }
+
+        function showBatchStatus(type, message) {
+            const el = document.getElementById('batch-status');
+            el.className = `batch-status ${type}`;
+            el.textContent = message;
+        }
+
+        function displayPatternSummary(summary) {
+            document.getElementById('pattern-summary').style.display = 'block';
+
+            document.getElementById('total-games').textContent = summary.total_games;
+            document.getElementById('overall-accuracy').textContent =
+                summary.overall_accuracy.toFixed(1) + '%';
+
+            // Recommendations
+            const recList = document.getElementById('recommendations-list');
+            recList.innerHTML = summary.recommendations
+                .map(rec => `<li>${rec}</li>`)
+                .join('');
+
+            // Tactical patterns
+            displayTacticalPatterns(summary.tactical_patterns);
+
+            // Phase stats
+            displayPhaseStats(summary.phase_stats);
+        }
+
+        function displayTacticalPatterns(patterns) {
+            const container = document.getElementById('tactical-patterns');
+
+            const entries = Object.entries(patterns).filter(([_, inst]) => inst.length > 0);
+
+            if (entries.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No significant tactical patterns detected.</p>';
+                return;
+            }
+
+            container.innerHTML = entries
+                .map(([patternType, instances]) => {
+                    const name = patternType.replace(/_/g, ' ').toUpperCase();
+                    const shown = instances.slice(0, 3);
+                    const instancesHtml = shown
+                        .map(inst => `
+                            <div class="pattern-instance">
+                                Game ${inst.game_index + 1}, Move ${inst.move_number}:
+                                ${inst.description}
+                                (Lost ${inst.lost_material} pawns)
+                            </div>
+                        `).join('');
+                    const more = instances.length > 3
+                        ? `<div class="pattern-instance">...and ${instances.length - 3} more</div>`
+                        : '';
+                    return `
+                        <div class="pattern-item">
+                            <h6>${name} (${instances.length} instance${instances.length !== 1 ? 's' : ''})</h6>
+                            ${instancesHtml}${more}
+                        </div>
+                    `;
+                }).join('');
+        }
+
+        function displayPhaseStats(phaseStats) {
+            const container = document.getElementById('phase-stats');
+
+            const entries = Object.entries(phaseStats);
+            if (entries.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No phase data available.</p>';
+                return;
+            }
+
+            container.innerHTML = entries
+                .map(([phase, stats]) => `
+                    <div class="phase-stat">
+                        <span class="phase-name">${phase}</span>
+                        <div>
+                            <span class="phase-accuracy">${stats.avg_accuracy.toFixed(1)}%</span>
+                            <span class="phase-errors">
+                                ${stats.blunder_count} blunders, ${stats.mistake_count} mistakes
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        // Export / Import
+        function exportBatchAnalysis() {
+            if (!batchAnalysis.patternSummary) {
+                alert('No analysis to export. Analyze some games first.');
+                return;
+            }
+
+            const data = JSON.stringify(batchAnalysis, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `chess_analysis_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importBatchAnalysis(file) {
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (!data.patternSummary || !data.analyzedGames) {
+                        throw new Error('Invalid analysis file format');
+                    }
+                    Object.assign(batchAnalysis, data);
+                    saveBatchToStorage();
+                    displayPatternSummary(data.patternSummary);
+                    showBatchStatus('success', `Loaded analysis of ${data.patternSummary.total_games} games`);
+                    switchTab('batch');
+                } catch (error) {
+                    alert(`Failed to import: ${error.message}`);
+                }
+            };
+            reader.readAsText(file);
+            document.getElementById('import-file').value = '';
+        }
+
+        // Wire up batch analysis event handlers
+        $(document).ready(function() {
+            document.getElementById('analyze-batch-btn').addEventListener('click', analyzeBatchGames);
+
+            document.getElementById('clear-batch-btn').addEventListener('click', () => {
+                document.getElementById('pgn-batch-input').value = '';
+                document.getElementById('pattern-summary').style.display = 'none';
+                document.getElementById('batch-status').className = 'batch-status';
+                batchAnalysis.games = [];
+                batchAnalysis.analyzedGames = [];
+                batchAnalysis.patternSummary = null;
+                batchAnalysis.timestamp = null;
+                saveBatchToStorage();
+            });
+
+            document.getElementById('export-analysis-btn').addEventListener('click', exportBatchAnalysis);
+
+            document.getElementById('import-analysis-btn').addEventListener('click', () => {
+                document.getElementById('import-file').click();
+            });
+
+            document.getElementById('import-file').addEventListener('change', (e) => {
+                importBatchAnalysis(e.target.files[0]);
+            });
+
+            // Load persisted batch analysis
+            loadBatchFromStorage();
+        });
+
         // ===== Chat Functions =====
         let conversationHistory = [];
         let currentLessonPlan = null;
@@ -1669,14 +2229,20 @@
             };
 
             try {
+                // Include pattern context if batch analysis is available
+                const chatPayload = {
+                    message: message,
+                    conversation_history: conversationHistory,
+                    board_context: boardContext
+                };
+                if (batchAnalysis.patternSummary) {
+                    chatPayload.pattern_context = batchAnalysis.patternSummary;
+                }
+
                 const response = await fetch(`${API_BASE_URL}/api/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        conversation_history: conversationHistory,
-                        board_context: boardContext
-                    })
+                    body: JSON.stringify(chatPayload)
                 });
 
                 if (!response.ok) {

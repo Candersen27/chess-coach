@@ -36,7 +36,7 @@ class ChessCoach:
         # Lesson plan manager
         self.lesson_manager = LessonManager()
 
-    def _get_system_prompt(self, board_context: dict = None) -> list:
+    def _get_system_prompt(self, board_context: dict = None, pattern_context: dict = None) -> list:
         """Build the system prompt with book content and board context.
 
         Returns a list of content blocks for prompt caching support.
@@ -107,9 +107,54 @@ Only generate a lesson plan when the student explicitly agrees to practice.
                 "text": context_text,
             })
 
+        # Pattern analysis context — appended when batch analysis data is available
+        if pattern_context:
+            recs = pattern_context.get("recommendations", [])
+            patterns = pattern_context.get("tactical_patterns", {})
+            phases = pattern_context.get("phase_stats", {})
+
+            pattern_lines = [
+                f"\n\n## Recent Game Analysis",
+                f"You have analyzed {pattern_context.get('total_games', 0)} of the student's recent games.",
+                f"Overall accuracy: {pattern_context.get('overall_accuracy', 0):.1f}%",
+            ]
+
+            if patterns:
+                pattern_lines.append("\n### Tactical Weaknesses:")
+                for ptype, instances in patterns.items():
+                    readable = ptype.replace("_", " ")
+                    game_count = len(set(i["game_index"] for i in instances))
+                    pattern_lines.append(
+                        f"- {readable.capitalize()}: {len(instances)} instances across {game_count} game(s)"
+                    )
+
+            if phases:
+                pattern_lines.append("\n### Performance by Phase:")
+                for phase_name, stats in phases.items():
+                    pattern_lines.append(
+                        f"- {phase_name.capitalize()}: {stats['avg_accuracy']:.1f}% accuracy, "
+                        f"{stats['blunder_count']} blunders, {stats['mistake_count']} mistakes"
+                    )
+
+            if recs:
+                pattern_lines.append("\n### Recommendations:")
+                for rec in recs:
+                    pattern_lines.append(f"- {rec}")
+
+            pattern_lines.append(
+                "\nUse this data to provide personalized coaching. "
+                "Reference these specific patterns and recommend targeted practice."
+            )
+
+            system_blocks.append({
+                "type": "text",
+                "text": "\n".join(pattern_lines),
+            })
+
         return system_blocks
 
-    async def chat(self, message: str, conversation_history: list = None, board_context: dict = None) -> dict:
+    async def chat(self, message: str, conversation_history: list = None,
+                   board_context: dict = None, pattern_context: dict = None) -> dict:
         """Send a message to the coach and get a response.
 
         Args:
@@ -137,7 +182,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=2048,
-            system=self._get_system_prompt(board_context),
+            system=self._get_system_prompt(board_context, pattern_context),
             messages=messages
         )
 

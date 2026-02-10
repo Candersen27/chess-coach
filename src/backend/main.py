@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional
 from engine import ChessEngine
 from coach import ChessCoach
 from books import BookLibrary
+from patterns import PatternDetector
 
 
 # Global instances
@@ -140,6 +141,13 @@ class GameAnalysisResponse(BaseModel):
     summary: GameSummary = Field(..., description="Game summary statistics")
 
 
+class BatchAnalysisRequest(BaseModel):
+    """Request model for batch game analysis."""
+    pgns: List[str] = Field(..., description="List of PGN strings to analyze")
+    depth: int = Field(default=15, ge=1, le=30, description="Analysis depth (1-30)")
+    username: Optional[str] = Field(None, description="Player's username to filter analysis to their moves only")
+
+
 class BoardContext(BaseModel):
     """Board context for chat messages."""
     fen: Optional[str] = None
@@ -158,6 +166,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_history: Optional[List[ChatMessage]] = []
     board_context: Optional[BoardContext] = None
+    pattern_context: Optional[dict] = None
 
 
 class ChatResponse(BaseModel):
@@ -274,6 +283,73 @@ async def analyze_game(request: GameAnalysisRequest):
         raise HTTPException(status_code=500, detail=f"Game analysis failed: {str(e)}")
 
 
+@app.post("/api/games/analyze-batch")
+async def analyze_batch(request: BatchAnalysisRequest):
+    """Analyze multiple games and detect recurring patterns.
+
+    Args:
+        request: Batch analysis request with list of PGNs and depth
+
+    Returns:
+        Analyzed games and aggregated pattern summary
+
+    Raises:
+        HTTPException: 400 if fewer than 5 games, 500 for engine errors
+    """
+    import io
+    import chess.pgn
+
+    if len(request.pgns) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide at least 5 games for pattern analysis",
+        )
+
+    analyzed_games = []
+    player_colors = []  # 'white', 'black', or None per game
+    errors = []
+
+    for i, pgn_str in enumerate(request.pgns):
+        try:
+            result = await chess_engine.analyze_game(pgn_str.strip(), request.depth)
+            analyzed_games.append(result)
+
+            # Determine which color the user played in this game
+            color = None
+            if request.username:
+                pgn_io = io.StringIO(pgn_str.strip())
+                game = chess.pgn.read_game(pgn_io)
+                if game:
+                    white_player = game.headers.get("White", "")
+                    black_player = game.headers.get("Black", "")
+                    uname = request.username.lower()
+                    if uname in white_player.lower():
+                        color = "white"
+                    elif uname in black_player.lower():
+                        color = "black"
+            player_colors.append(color)
+
+        except ValueError as e:
+            errors.append(f"Game {i + 1}: {str(e)}")
+        except Exception as e:
+            errors.append(f"Game {i + 1}: Analysis failed - {str(e)}")
+
+    if len(analyzed_games) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {len(analyzed_games)} games analyzed successfully "
+                   f"(need at least 5). Errors: {'; '.join(errors)}",
+        )
+
+    detector = PatternDetector()
+    pattern_summary = detector.analyze_games(analyzed_games, player_colors)
+
+    return {
+        "analyzed_games": analyzed_games,
+        "pattern_summary": pattern_summary,
+    }
+
+
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_coach(request: ChatRequest):
     """Chat with the chess coach.
@@ -297,7 +373,8 @@ async def chat_with_coach(request: ChatRequest):
         response = await chess_coach.chat(
             message=request.message,
             conversation_history=history,
-            board_context=board_ctx
+            board_context=board_ctx,
+            pattern_context=request.pattern_context,
         )
         return response
 

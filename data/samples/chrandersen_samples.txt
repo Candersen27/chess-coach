@@ -1,0 +1,162 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.09.29"]
+[Round "-"]
+[White "magedoooo"]
+[Black "Chrandersen"]
+[Result "1-0"]
+[CurrentPosition "6r1/5Q1p/pk6/2qp4/N1p3n1/8/PPP2P1P/3R3K b - - 2 26"]
+[Timezone "UTC"]
+[ECO "D00"]
+[ECOUrl "https://www.chess.com/openings/Queens-Pawn-Opening-Chigorin-Variation-2...Nf6-3.Bf4-e6-4.e3"]
+[UTCDate "2025.09.29"]
+[UTCTime "01:59:43"]
+[WhiteElo "979"]
+[BlackElo "907"]
+[TimeControl "900+10"]
+[Termination "magedoooo won by resignation"]
+[StartTime "01:59:43"]
+[EndDate "2025.09.29"]
+[EndTime "02:14:18"]
+[Link "https://www.chess.com/analysis/game/live/143681135974/games"]
+[WhiteUrl "https://images.chesscomfiles.com/uploads/v1/user/416315457.5d546271.50x50o.525d0e703aaa.jpg"]
+[WhiteCountry "45"]
+[WhiteTitle ""]
+[BlackUrl "https://images.chesscomfiles.com/uploads/v1/user/52221120.597031e8.50x50o.5e94328aae40.jpeg"]
+[BlackCountry "2"]
+[BlackTitle ""]
+
+1. d4 d5 2. Nc3 Nf6 3. Bf4 e6 4. e3 Bd6 5. Nf3 Bxf4 6. exf4 b6 7. Bd3 Bd7 8. O-O
+c5 9. dxc5 bxc5 10. Bb5 c4 11. Ne5 a6 12. Bxd7+ Nbxd7 13. Nxd7 Qxd7 14. Re1 Qd6
+15. Re5 g5 16. g3 gxf4 17. gxf4 Rg8+ 18. Rg5 O-O-O 19. Qf3 e5 20. Rxg8 Rxg8+ 21.
+Kh1 exf4 22. Rd1 Qc5 23. Qxf4 Ng4 24. Qf5+ Kc7 25. Qxf7+ Kb6 26. Na4+ 1-0
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.09.29"]
+[Round "-"]
+[White "Chrandersen"]
+[Black "DrFarts420"]
+[Result "1-0"]
+[CurrentPosition "8/P1k5/2P4p/3K4/7p/1p6/1P4P1/8 b - - 0 40"]
+[Timezone "UTC"]
+[ECO "C50"]
+[ECOUrl "https://www.chess.com/openings/Giuoco-Piano-Game-Giuoco-Pianissimo-Variation-4...Nf6"]
+[UTCDate "2025.09.29"]
+[UTCTime "01:18:03"]
+[WhiteElo "902"]
+[BlackElo "828"]
+[TimeControl "900+10"]
+[Termination "Chrandersen won by resignation"]
+[StartTime "01:18:03"]
+[EndDate "2025.09.29"]
+[EndTime "01:33:35"]
+[Link "https://www.chess.com/analysis/game/live/143680397098/games"]
+[WhiteUrl "https://images.chesscomfiles.com/uploads/v1/user/52221120.597031e8.50x50o.5e94328aae40.jpeg"]
+[WhiteCountry "2"]
+[WhiteTitle ""]
+[BlackUrl "https://images.chesscomfiles.com/uploads/v1/user/195307181.bdb619bb.50x50o.5d7b8fe78513.jpeg"]
+[BlackCountry "2"]
+[BlackTitle ""]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. Be3 Bxe3 6. fxe3 O-O 7. d4 Qe7 8. c3
+exd4 9. Nxd4 Qxe4 10. Qf3 Nxd4 11. Qxe4 Nxe4 12. exd4 Re8 13. O-O Ng5 14. h4 Ne4
+15. Rxf7 Nd6 16. Re7+ Nxc4 17. Rxe8+ Kf7 18. Re2 d5 19. Nd2 Nxd2 20. Rxd2 Kg8
+21. Rf2 Bd7 22. Re1 Re8 23. Rxe8+ Bxe8 24. Kf1 a5 25. Ke2 b5 26. Kd3 c6 27. Re2
+c5 28. dxc5 b4 29. cxb4 Bb5+ 30. Kd2 Bxe2 31. Kxe2 axb4 32. Kd3 Kf8 33. Kd4 Ke7
+34. Kxd5 Kd7 35. c6+ Kc7 36. a3 b3 37. a4 h6 38. a5 g5 39. a6 gxh4 40. a7 1-0
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.09.21"]
+[Round "?"]
+[White "Chrandersen"]
+[Black "filip75"]
+[Result "0-1"]
+[TimeControl "600"]
+[WhiteElo "883"]
+[BlackElo "894"]
+[Termination "filip75 won by resignation"]
+[ECO "C00"]
+[EndTime "21:00:27 GMT+0000"]
+[Link "https://www.chess.com/game/live/143401446248?move=0"]
+
+1. d4 e6 2. e4 h6 3. Nf3 Nc6 4. c4 d6 5. d5 Nb8 6. Nc3 a6 7. Be3 exd5 8. cxd5
+Qf6 9. Bd4 Qg6 10. g3 c5 11. Be3 Ne7 12. Bd3 Qf6 13. O-O Bg4 14. Be2 Bxf3 15.
+Bxf3 Nd7 16. Be2 Nb6 17. b3 h5 18. Qc2 h4 19. a4 hxg3 20. fxg3 Qg6 21. a5 Nd7
+22. Qd1 f5 23. Bh5 Qxh5 24. Qxh5+ Rxh5 25. exf5 Nxf5 26. g4 Nxe3 27. gxh5 Nxf1
+28. Rxf1 Nf6 29. Re1+ Kf7 30. Ne4 Nxh5 31. Nxd6+ Bxd6 0-1
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.09.21"]
+[Round "?"]
+[White "Chrandersen"]
+[Black "Hsvksgwnw"]
+[Result "0-1"]
+[TimeControl "600"]
+[WhiteElo "922"]
+[BlackElo "940"]
+[Termination "Hsvksgwnw won by checkmate"]
+[ECO "B22"]
+[EndTime "5:12:59 GMT+0000"]
+[Link "https://www.chess.com/game/live/143372599620"]
+
+1. e4 c5 2. c3 d5 3. d3 Nc6 4. exd5 Qxd5 5. Qf3 Qd8 6. Be3 e5 7. Nd2 Nf6 8.
+O-O-O Bg4 9. Qg3 Bxd1 10. Kxd1 Nh5 11. Qf3 g6 12. Nc4 Bg7 13. g4 Nf6 14. Bg5 e4
+15. Qf4 O-O 16. Kc2 exd3+ 17. Bxd3 Na5 18. Nxa5 Qxa5 19. Bxf6 Bxf6 20. Qxf6 Qa4+
+21. Kd2 Qxa2 22. Bc2 Rad8+ 23. Ke3 Qxb2 24. h4 Qxc2 25. h5 Rfe8+ 26. Kf3 Qd3+
+27. Kg2 Re6 28. Qh4 gxh5 29. Qxh5 Qg6 30. Qxg6+ Rxg6 31. Kg3 Rd3+ 32. f3 Rxc3
+33. Nh3 Rf6 34. Ng5 Rb6 35. Rxh7 a5 36. Rxf7 a4 37. Kh4 a3 38. Rd7 Rh6+ 39. Kg3
+a2 40. Rxb7 a1=Q 41. Rb8+ Kg7 42. Rb7+ Kf6 43. Rb6+ Kg7 44. Rb7+ Kf8 45. Nh7+
+Rxh7 46. Rxh7 Qg1+ 47. Kf4 Rc4+ 48. Kg5 Qe3+ 49. Kh4 Qf2+ 50. Kg5 Qxf3 51. Rh8+
+Kg7 52. Rh6 Qxg4# 0-1
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.07.17"]
+[Round "?"]
+[White "Chrandersen"]
+[Black "Jonn_Kepler"]
+[Result "0-1"]
+[TimeControl "900+10"]
+[WhiteElo "980"]
+[BlackElo "1010"]
+[Termination "Jonn_Kepler won by resignation"]
+[ECO "C28"]
+[EndTime "4:30:33 GMT+0000"]
+[Link "https://www.chess.com/game/live/140783504046"]
+
+1. e4 e5 2. Nc3 Nc6 3. Bc4 Nf6 4. d3 Bc5 5. f4 d6 6. Nf3 h6 7. f5 a6 8. Qe2 b5
+9. Nxb5 axb5 10. Bxb5 Bd7 11. Be3 Nd4 12. Bxd7+ Nxd7 13. Nxd4 exd4 14. Bf2 Bb4+
+15. Kd1 O-O 16. Bxd4 Ne5 17. c3 c5 18. Bxe5 dxe5 19. cxb4 cxb4 20. Kd2 Rc8 21.
+Rac1 Qa5 22. Ke3 Qxa2 23. Rc2 b3 24. Rc3 Rxc3 25. bxc3 b2 26. Qc2 Qa7+ 27. Kf3
+Rb8 28. Rb1 Qa3 29. h4 g5 30. hxg5 hxg5 31. Kg4 f6 32. Kh5 Kh7 33. g4 Rh8 0-1
+
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2025.05.02"]
+[Round "?"]
+[White "ewkyve"]
+[Black "Chrandersen"]
+[Result "0-1"]
+[TimeControl "600"]
+[WhiteElo "929"]
+[BlackElo "976"]
+[Termination "Chrandersen won by checkmate"]
+[ECO "C01"]
+[EndTime "3:43:46 GMT+0000"]
+[Link "https://www.chess.com/game/live/138008091486"]
+
+1. e4 e6 2. Nf3 d5 3. exd5 exd5 4. d4 c5 5. c3 c4 6. b3 b5 7. b4 a5 8. a3 axb4
+9. cxb4 Bxb4+ 10. Bd2 Bd6 11. Nc3 Qe7+ 12. Be2 Rxa3 13. Rxa3 Bxa3 14. Nxd5 Qd6
+15. Nf4 Bb4 16. Bxb4 Qxb4+ 17. Qd2 Qxd2+ 18. Nxd2 c3 19. Nb3 Nf6 20. Bxb5+ Bd7
+21. Bxd7+ Nbxd7 22. O-O O-O 23. Rc1 Re8 24. f3 Re3 25. Nc5 Nb6 26. Ne4 Nbd5 27.
+Nxd5 Nxd5 28. Kf2 f5 29. Nd6 f4 30. Nf5 Rd3 31. g3 g6 32. Nh4 Rxd4 33. gxf4 Rxf4
+34. Ng2 Rd4 35. Ne3 Rd2+ 36. Kg3 Nxe3 37. Rxc3 Nf5+ 38. Kg4 Rxh2 39. Rc8+ Kg7
+40. Rc7+ Kh6 41. f4 Rc2 42. Rxc2 Ne3+ 43. Kf3 Nxc2 44. Kg4 Nd4 45. Kg3 Nf5+ 46.
+Kg4 Ng7 47. Kg3 Kh5 48. Kf3 Kh4 49. Ke4 Kg4 50. Ke5 g5 51. f5 Nxf5 52. Ke4 h5
+53. Kd3 h4 54. Ke2 Kg3 55. Kf1 Kh2 56. Kf2 g4 57. Kf1 g3 58. Ke1 g2 59. Kf2
+g1=Q+ 60. Kf3 Qg2+ 61. Kf4 Qg3+ 62. Kxf5 Kg2 63. Ke4 Qh3 64. Kf4 Kf2 65. Kg5 Qf3
+66. Kxh4 Qg3+ 67. Kh5 Kf3 68. Kh6 Qg4 69. Kh7 Qg5 70. Kh8 Kf4 71. Kh7 Kf5 72.
+Kh8 Kf6 73. Kh7 Qg7# 0-1

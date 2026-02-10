@@ -29,6 +29,12 @@ Think of the system like a restaurant kitchen:
 │   │  - Handles drag/drop             - Tracks game state    │  │
 │   │  - Pretty to look at             - Parses PGN files     │  │
 │   └─────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│   ┌─────────────────────────────────────────────────────────┐  │
+│   │  The Chat Panel                                          │  │
+│   │  - Talk to your coach           - See conversation       │  │
+│   │  - Ask questions                - Get explanations       │  │
+│   └─────────────────────────────────────────────────────────┘  │
 └──────────────────────────────│──────────────────────────────────┘
                                │
                     Waiter takes orders
@@ -40,20 +46,19 @@ Think of the system like a restaurant kitchen:
 │                  (Python FastAPI Server)                        │
 │                                                                 │
 │   The head chef coordinates everything and                     │
-│   talks to the specialist in the back...                       │
-└──────────────────────────────│──────────────────────────────────┘
-                               │
-                    Internal conversation
-                      (UCI Protocol)
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    THE EXPERT                                   │
-│                    (Stockfish)                                  │
-│                                                                 │
-│   A chess grandmaster sitting in a back room who               │
-│   analyzes positions when asked and suggests moves             │
-└─────────────────────────────────────────────────────────────────┘
+│   talks to the specialists...                                  │
+└───────────────────┬─────────────────────┬───────────────────────┘
+                    │                     │
+         UCI Protocol               Claude API
+                    │                     │
+                    ▼                     ▼
+┌───────────────────────────┐ ┌───────────────────────────────────┐
+│      THE ANALYST          │ │         THE COACH                 │
+│      (Stockfish)          │ │         (Claude)                  │
+│                           │ │                                   │
+│  Chess grandmaster who    │ │  Patient teacher who explains    │
+│  calculates positions     │ │  concepts and guides learning    │
+└───────────────────────────┘ └───────────────────────────────────┘
 ```
 
 The frontend is what you see and interact with. It handles the visual presentation and basic game logic. When it needs serious analysis - "what's the best move here?" or "how good was that game?" - it asks the backend.
@@ -316,7 +321,103 @@ The tradeoff: refresh the page and your game is gone. For an MVP, that's fine. L
 
 ---
 
-## 7. The Data Flow
+## 7. The AI Coach (Claude Integration)
+
+Phase 2 brought the AI coaching layer: you can now have a conversation with Claude about your chess games directly in the interface.
+
+### The Coach Module
+
+The backend gained a new module (`coach.py`) that wraps the Claude API:
+
+```python
+class ChessCoach:
+    def __init__(self):
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.client = AsyncAnthropic(api_key=api_key)
+        self.model = "claude-sonnet-4-20250514"
+
+    async def chat(self, message, conversation_history, board_context):
+        # Build messages with history
+        # Inject board context into system prompt
+        # Call Claude API
+        # Return response
+```
+
+The coach is initialized alongside Stockfish when the server starts, using the same lifespan pattern:
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await chess_engine.start()
+    chess_coach = ChessCoach()  # New
+    yield
+    await chess_engine.stop()
+```
+
+### The Coaching Persona
+
+The system prompt defines how the coach behaves:
+
+- **Patient and Socratic** - Asks questions to understand what the student wants
+- **Concrete** - Gives actionable advice, not vague platitudes
+- **Board-aware** - Knows the current position and can reference it
+- **Honest** - Encouraging but truthful about mistakes
+
+Importantly, the coach does NOT calculate tactics itself. That's Stockfish's job. The coach explains *why* moves are good or bad, guides learning, and helps the student understand concepts.
+
+### Board Context
+
+Every chat message includes the current board state:
+
+```javascript
+const boardContext = {
+    fen: getCurrentFEN(),      // Current position
+    last_move: getLastMove(),  // Most recent move
+    mode: getCurrentMode()     // 'play', 'analysis', or 'idle'
+};
+```
+
+This gets injected into Claude's system prompt, so it knows what position you're looking at. When you ask "Why is this move bad?", Claude can actually see the position you're referring to.
+
+### Conversation State
+
+Like the game state, conversation history lives in the frontend:
+
+```javascript
+let conversationHistory = [];
+
+// After each exchange:
+conversationHistory.push({ role: 'user', content: message });
+conversationHistory.push({ role: 'assistant', content: response });
+```
+
+This keeps the backend stateless - any request contains everything needed to continue the conversation. The tradeoff is that refreshing the page loses your chat history (same as the game state).
+
+### The Chat UI
+
+The frontend gained a third column: board | panels | chat. The chat panel includes:
+
+- A scrollable messages area
+- User messages (blue, right-aligned)
+- Coach messages (gray, left-aligned)
+- A "Thinking..." indicator during API calls
+- Enter key or button to send
+
+One subtle detail: arrow key shortcuts for navigating moves are disabled when the chat input is focused. Otherwise you'd be jumping through game history while trying to type.
+
+### Why This Architecture
+
+The coach is intentionally separate from Stockfish:
+
+- **Different concerns** - Stockfish calculates; Claude explains
+- **Different APIs** - UCI protocol vs. HTTP/JSON
+- **Different failure modes** - Stockfish is local and fast; Claude requires network and may be slow
+
+By keeping them separate, each can be tested, scaled, and modified independently. The backend orchestrates them but doesn't mix their responsibilities.
+
+---
+
+## 8. The Data Flow (Updated)
 
 Let's trace two complete user journeys:
 
@@ -384,9 +485,46 @@ Let's trace two complete user journeys:
 14. Status shows "Your turn (White)"
 ```
 
+### Journey 3: "User asks coach about a position → gets explanation"
+
+```
+1. User is looking at a position (maybe after a blunder)
+   ↓
+2. User types "Why was my last move bad?" in chat input
+   ↓
+3. User presses Enter or clicks Send
+   ↓
+4. sendMessage() gathers board context:
+   - FEN of current position
+   - Last move played
+   - Current mode (analysis/play/idle)
+   ↓
+5. POST /api/chat with message, conversation_history, board_context
+   ↓
+6. Backend builds Claude messages array from history
+   ↓
+7. Backend injects board context into system prompt:
+   "Current position (FEN): rnbqkb1r/..."
+   ↓
+8. Claude API call with full context
+   ↓
+9. Claude analyzes position conceptually and responds:
+   "That move lost material because it left your knight undefended..."
+   ↓
+10. Backend returns {"message": "...", "suggested_action": null}
+    ↓
+11. Frontend removes "Thinking..." indicator
+    ↓
+12. Frontend displays coach message (gray, left-aligned)
+    ↓
+13. Frontend updates conversationHistory array
+    ↓
+14. User can continue the conversation with follow-up questions
+```
+
 ---
 
-## 8. Technical Decisions Explained
+## 9. Technical Decisions Explained
 
 ### WSL as Development Environment
 
@@ -430,7 +568,7 @@ Premature optimization is the root of all evil. Start simple.
 
 ---
 
-## 9. Bugs We Hit and What They Taught Us
+## 10. Bugs We Hit and What They Taught Us
 
 ### Bug 1: Piece Images Not Rendering
 
@@ -556,7 +694,7 @@ cp_loss = eval_before_cp - eval_after_cp
 
 ---
 
-## 10. Patterns Worth Reusing
+## 11. Patterns Worth Reusing
 
 ### Async Engine Management in Python
 
@@ -622,7 +760,7 @@ Everything is stateless. Position comes in, analysis comes out. This makes the A
 
 ---
 
-## 11. What Good Engineering Looks Like Here
+## 12. What Good Engineering Looks Like Here
 
 ### Starting with the Data Layer
 
@@ -674,21 +812,23 @@ Writing it down in the backlog scratches the itch without derailing the current 
 
 ---
 
-## 12. Where This Is Going
+## 13. Where This Is Going
 
-Phase 1 (complete) built the data layer - everything needed to analyze chess games and positions.
+**Phase 1 (complete):** Built the data layer - everything needed to analyze chess games and positions.
 
-**Phase 2: Database + Persistence**
+**Phase 2 (in progress):** The AI coaching layer.
+- ✅ Claude API integration with coaching persona
+- ✅ Chat interface in the frontend
+- ✅ Board context passed to Claude (position, last move, mode)
+- ⬜ Claude controlling the board to illustrate points
+- ⬜ Lesson plan generation based on game analysis
+
+**Phase 3: Database + Persistence**
 - Store analyzed games in PostgreSQL
 - User profiles with playing history
 - Track accuracy over time
 - Build a picture of the player's strengths/weaknesses
-
-**Phase 3: Claude API Integration**
-- Natural language coaching conversations
-- "Why was that move a mistake?" → Claude explains using the analysis data
-- "What should I study?" → Claude looks at mistake patterns and recommends
-- The board becomes a visual aid Claude can manipulate
+- Persistent conversation history
 
 **Phase 4: RAG for Chess Knowledge**
 - Embed chess strategy books and articles
@@ -696,11 +836,11 @@ Phase 1 (complete) built the data layer - everything needed to analyze chess gam
 - "This is like the technique Capablanca used in..."
 - Connect the player's games to chess literature
 
-Phase 1's architecture directly enables all of this. The programmatic board API means Claude can set up positions while explaining. The analysis endpoints give Claude the evaluations to discuss. The stateless backend will make it easy to add a database layer.
+The architecture continues to pay dividends. The programmatic board API means Claude will eventually be able to set up positions while explaining. The analysis endpoints give Claude evaluations to discuss. The stateless backend pattern extends naturally to the chat endpoint.
 
 ---
 
-## 13. Quick Reference
+## 14. Quick Reference
 
 ### Running the Project
 
@@ -722,9 +862,11 @@ http://localhost:8000/docs (interactive Swagger UI)
 
 | File | Purpose |
 |------|---------|
-| `src/frontend/chessboard.html` | The entire frontend application |
+| `src/frontend/chessboard.html` | The entire frontend application (board + panels + chat) |
 | `src/backend/main.py` | FastAPI app, routes, request/response models |
 | `src/backend/engine.py` | Stockfish wrapper, analysis logic |
+| `src/backend/coach.py` | Claude API wrapper, coaching logic |
+| `.env` | API keys (gitignored, never committed) |
 | `docs/DECISIONS.md` | Why we made each technical choice |
 | `docs/PROGRESS.md` | What was built each session |
 | `docs/ARCHITECTURE.md` | System overview diagrams |
@@ -737,12 +879,15 @@ http://localhost:8000/docs (interactive Swagger UI)
 | `/api/analyze` | POST | Single position analysis |
 | `/api/move` | POST | Get engine move at ELO |
 | `/api/game/analyze` | POST | Full game analysis |
+| `/api/chat` | POST | Chat with the AI coach |
 
 ### Dependencies
 
 **Backend (Python):**
 - FastAPI + uvicorn (web server)
 - python-chess (Stockfish integration)
+- anthropic (Claude API client)
+- python-dotenv (environment variable loading)
 - Stockfish (system binary at /usr/games/stockfish)
 
 **Frontend (JavaScript):**
@@ -750,6 +895,9 @@ http://localhost:8000/docs (interactive Swagger UI)
 - chessboard.js 1.0.0 (board rendering)
 - chess.js 0.10.3 (game logic)
 
+**Environment:**
+- `.env` file with `ANTHROPIC_API_KEY` (required for chat)
+
 ---
 
-*This walkthrough reflects the project as of Phase 1 completion. Future sessions will add database persistence, Claude API integration, and RAG capabilities. The architecture described here was designed with those extensions in mind.*
+*This walkthrough reflects the project as of Session 05 (Phase 2 in progress). You can now have conversations with an AI chess coach that sees your board position. Future sessions will add board control for Claude, lesson generation, database persistence, and RAG capabilities.*

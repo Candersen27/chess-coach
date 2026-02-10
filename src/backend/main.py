@@ -10,25 +10,30 @@ from typing import Dict, Any, List, Optional
 
 from engine import ChessEngine
 from coach import ChessCoach
+from books import BookLibrary
 
 
 # Global instances
 chess_engine = ChessEngine()
 chess_coach = None
+book_library = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage the lifespan of the FastAPI application."""
-    global chess_coach
-    # Startup: Initialize the chess engine and coach
+    global chess_coach, book_library
+    # Startup: Initialize the chess engine, book library, and coach
     await chess_engine.start()
     print("Chess engine started successfully")
     try:
         chess_coach = ChessCoach()
+        book_library = chess_coach.library
         print("Chess coach initialized successfully")
     except ValueError as e:
         print(f"Warning: Chess coach not available - {e}")
+        # Still load books even if coach API key is missing
+        book_library = BookLibrary()
     yield
     # Shutdown: Clean up the chess engine
     await chess_engine.stop()
@@ -298,6 +303,43 @@ async def chat_with_coach(request: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+@app.get("/api/books")
+async def list_books():
+    """List available chess books and their structure.
+
+    Returns:
+        List of books with metadata, chapters, and topics
+    """
+    if book_library is None:
+        return {"books": []}
+
+    books = []
+    for title, book in book_library.books.items():
+        chapters = []
+        for part in book["parts"]:
+            for ch in part["chapters"]:
+                sections = [
+                    {"number": s["section_number"], "title": s["title"], "topics": s["topics"]}
+                    for s in ch["sections"]
+                ]
+                chapters.append({
+                    "number": ch["chapter_number"],
+                    "title": ch["title"],
+                    "sections": sections,
+                })
+
+        books.append({
+            "title": title,
+            "author": book["metadata"]["author"],
+            "year": book["metadata"]["year"],
+            "total_sections": book["metadata"]["total_sections"],
+            "total_games": book["metadata"]["total_games"],
+            "chapters": chapters,
+        })
+
+    return {"books": books}
 
 
 if __name__ == "__main__":

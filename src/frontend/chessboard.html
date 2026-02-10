@@ -539,6 +539,64 @@
             align-self: flex-start;
         }
 
+        .lesson-plan-card {
+            background: #f0f7ff;
+            border: 1px solid #b8d4f0;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+            align-self: flex-start;
+            max-width: 90%;
+            font-size: 13px;
+        }
+
+        .lesson-plan-card h4 {
+            margin: 0 0 8px 0;
+            color: #1a5276;
+            font-size: 14px;
+        }
+
+        .lesson-plan-card .lesson-type {
+            display: inline-block;
+            background: #1a5276;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-bottom: 8px;
+        }
+
+        .lesson-plan-card ul {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+
+        .lesson-plan-card li {
+            margin: 2px 0;
+        }
+
+        .lesson-plan-card .lesson-source {
+            color: #666;
+            font-style: italic;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+
+        .lesson-active-banner {
+            background: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #2e7d32;
+            display: none;
+        }
+
+        .lesson-active-banner.visible {
+            display: block;
+        }
+
         .chat-message.thinking {
             background: #f0f0f0;
             color: #666;
@@ -726,6 +784,7 @@
                     <div class="chat-header">
                         <h3>Chess Coach</h3>
                     </div>
+                    <div id="lessonBanner" class="lesson-active-banner"></div>
                     <div id="chatMessages" class="chat-messages">
                     </div>
                     <div class="chat-input-area">
@@ -1577,6 +1636,7 @@
 
         // ===== Chat Functions =====
         let conversationHistory = [];
+        let currentLessonPlan = null;
 
         function initChat() {
             addChatMessage('assistant', "Hi! I'm your chess coach. What would you like to work on today?");
@@ -1630,6 +1690,12 @@
                 removeChatMessage(thinkingId);
                 addChatMessage('assistant', data.message);
 
+                // Handle lesson plan if present
+                if (data.suggested_action && data.suggested_action.type === 'start_lesson') {
+                    currentLessonPlan = data.suggested_action.lesson_plan;
+                    displayLessonPlan(currentLessonPlan);
+                }
+
                 // Update conversation history
                 conversationHistory.push({ role: 'user', content: message });
                 conversationHistory.push({ role: 'assistant', content: data.message });
@@ -1671,10 +1737,45 @@
         }
 
         function getCurrentMode() {
+            if (currentLessonPlan) return 'lesson';
             if (typeof isPlaying !== 'undefined' && isPlaying) return 'play';
             const analysisPanel = document.getElementById('analysisPanel');
             if (analysisPanel && analysisPanel.classList.contains('visible')) return 'analysis';
             return 'idle';
+        }
+
+        function displayLessonPlan(plan) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const card = document.createElement('div');
+            card.className = 'lesson-plan-card';
+
+            const goalsHtml = plan.goals
+                ? plan.goals.map(g => `<li>${g}</li>`).join('')
+                : '';
+
+            let sourceHtml = '';
+            if (plan.source_reference) {
+                const ref = plan.source_reference;
+                const parts = [ref.book, ref.chapter, ref.section].filter(Boolean);
+                if (parts.length) {
+                    sourceHtml = `<div class="lesson-source">Source: ${parts.join(' > ')}</div>`;
+                }
+            }
+
+            card.innerHTML = `
+                <h4>Lesson: ${plan.topic || 'Practice Session'}</h4>
+                <span class="lesson-type">${(plan.type || plan.activity?.type || '').replace(/_/g, ' ')}</span>
+                ${goalsHtml ? `<ul>${goalsHtml}</ul>` : ''}
+                ${sourceHtml}
+            `;
+
+            messagesDiv.appendChild(card);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Show lesson banner
+            const banner = document.getElementById('lessonBanner');
+            banner.textContent = 'Lesson active: ' + (plan.topic || 'Practice Session');
+            banner.classList.add('visible');
         }
 
         // Initialize chat on page load

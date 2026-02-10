@@ -321,4 +321,73 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 06 - 2025-02-10 (Book Integration + Lesson Plans)
+
+**Goal:** Parse chess book into structured JSON, integrate into coaching context, enable lesson plan generation
+**Duration:** ~2 hours
+**Outcome:** Success
+
+### Accomplished
+**Book Parsing:**
+- Created `scripts/parse_book.py` — parses Capablanca's Chess Fundamentals from raw Gutenberg text
+- Strips Gutenberg header/footer, front matter, and table of contents
+- Extracts all 33 sections across 6 chapters with topic keywords
+- Extracts all 14 illustrative games with metadata (players, opening, event)
+- Outputs structured JSON to `data/books/chess_fundamentals.json` (240KB)
+- Handles edge cases: chess notation false-positives (castling), colons/commas in titles
+
+**Book Integration:**
+- Created `src/backend/books.py` — BookLibrary class for loading and querying books
+- Auto-loads all JSON books from `data/books/` directory
+- Topic search, section lookup, and full-content formatting for prompts
+- Book content (~57K tokens) included in system prompt with prompt caching support
+- Cache control block marks book content as `ephemeral` for Anthropic's caching
+
+**Lesson Plan Module:**
+- Created `src/backend/lesson.py` — Pydantic models and lesson management
+- LessonPlan, LessonActivity, Position, SourceReference models
+- LessonManager tracks current lesson and history
+- `extract_lesson_json()` parses JSON from Claude's `[LESSON_PLAN]` marker
+- Handles JSON in markdown code blocks and bare format
+
+**Coach Updates:**
+- Updated `src/backend/coach.py` — book content in system prompt, lesson plan extraction
+- System prompt instructs Claude to reference Capablanca naturally
+- Prompt caching via content blocks with `cache_control`
+- Response parsing splits conversational message from lesson plan JSON
+- `suggested_action` carries lesson plan to frontend when generated
+- Max tokens increased from 1024 to 2048 for richer responses
+
+**API Updates:**
+- Added `GET /api/books` endpoint — lists available books with chapters/topics
+- `BookLibrary` shared between coach and API endpoint
+- `ChatResponse.suggested_action` now carries lesson plan data
+
+**Frontend Updates:**
+- Lesson plan card display in chat (styled card with topic, type, goals, source reference)
+- Lesson active banner at top of chat panel
+- `currentLessonPlan` stored in JavaScript for Session 07 integration
+- `getCurrentMode()` reports "lesson" when a lesson is active
+
+### Issues Encountered
+- **Section regex false-positives:** Chess notation like "5. O - O" matched the section header pattern
+  - Solution: Filter requiring at least 1 word of 4+ characters in title
+- **Missing sections 29-30:** Titles with colons and commas weren't in character class
+  - Solution: Extended regex to include `:,` characters
+- **Rate limit on second API call:** ~57K token book content exceeded 30K tokens/min org limit
+  - Expected behavior for tier-limited accounts; prompt caching will help after first call
+
+### Key Learnings
+- Full context approach is genuinely simpler than RAG for small book collections
+- Prompt caching with content blocks is straightforward with Anthropic SDK
+- Book parsing needs iterative regex tuning — real text has many edge cases
+- The `[LESSON_PLAN]` marker approach cleanly separates chat from structured data
+
+### Next Session
+- Session 07: Board integration — Claude controls the board based on lesson plans
+- Implement position loading from lesson plan FEN strings
+- Real-time coaching commentary during practice activities
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

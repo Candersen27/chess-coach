@@ -272,4 +272,42 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-016] Full Context + Prompt Caching Over RAG
+**Date:** 2025-02-10
+**Status:** Accepted
+**Context:** Need to integrate chess book content (~65K tokens) into coaching conversations. Options: RAG with vector embeddings, keyword search, or full context inclusion.
+**Decision:** Include full book content in system prompt with Anthropic's prompt caching.
+**Rationale:**
+- For 1-3 books (~200K tokens), full context is simpler and more accurate than vector search
+- No retrieval errors — Claude sees the entire book
+- Prompt caching reduces cost by ~90% on the cached portion after the first call
+- Avoids complexity of embedding pipeline, vector database, chunk management
+- Scaling path documented: keyword search at 4-10 books, embeddings at 10+
+**Consequences:**
+- First API call in a session pays full price for ~65K tokens
+- Subsequent calls benefit from prompt caching (~90% discount)
+- System prompt is large but Claude handles it well
+- Cannot exceed context window limit (currently 200K tokens)
+
+---
+
+### [DECISION-017] Lesson Plan JSON Structure with [LESSON_PLAN] Marker
+**Date:** 2025-02-10
+**Status:** Accepted
+**Context:** Need structured lesson plans from coaching conversations. Options: separate API call, tool use, inline JSON.
+**Decision:** Claude includes lesson plan JSON at end of message after `[LESSON_PLAN]` marker.
+**Rationale:**
+- Keeps conversational response and structured data in a single API call
+- Easy to parse — split on marker, extract JSON
+- Claude's response reads naturally without the JSON clutter
+- Frontend receives both the chat message and the plan in one response
+- No extra API round-trip needed
+**Consequences:**
+- Must handle parsing failures gracefully (JSON might be malformed)
+- Lesson plan only generated when student explicitly agrees to practice
+- `suggested_action` field in ChatResponse carries the plan to frontend
+- Lesson plans are generated but not executed yet (Session 07)
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

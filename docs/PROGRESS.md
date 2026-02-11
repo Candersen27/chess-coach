@@ -432,4 +432,62 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 08 Phase 1 - 2025-02-11 (Board Control Foundation)
+
+**Goal:** Enable Claude to control the chessboard during coaching — show positions, let users interact, provide Stockfish-backed coaching on moves
+**Duration:** ~2 hours
+**Outcome:** Success
+
+### Accomplished
+**Backend — Engine (engine.py):**
+- Added `get_coaching_context(fen, depth)` — returns evaluation, top 3 moves with SAN, mate detection
+- Added `evaluate_move(fen, move_san, depth)` — before/after analysis, eval loss, move classification
+- Uses `multipv=3` for multi-line analysis with existing python-chess async interface
+- Reuses existing `classify_move()` thresholds for consistency
+
+**Backend — Coach (coach.py):**
+- Added `BOARD_CONTROL_TOOL` definition for `set_board_position` tool
+- Updated system prompt with board control capability instructions
+- Created `chat_with_tools()` — calls Claude with tool, parses text + tool_use blocks
+- Maintained backward compatibility via `chat()` wrapper method
+- Tool calling coexists with existing lesson plan extraction
+
+**Backend — API (main.py):**
+- Added `CoachMoveRequest` Pydantic model (fen, move, context)
+- Added `POST /api/coach/move` endpoint — Stockfish analysis → Claude coaching pipeline
+- Updated `POST /api/chat` to use `chat_with_tools()` and return `board_control`
+- Added `board_control` field to `ChatResponse` model
+- Error handling for invalid FEN and illegal moves (400 status)
+
+**Frontend (chessboard.html):**
+- Added mode toggle UI ("My Game" / "Coach Demo" buttons) above the board
+- Added `gameState` object tracking both modes independently
+- `switchToCoachDemo(boardControl)` — auto-switches when Claude shows position
+- `switchToMyGame()` — restores user's game state (PGN + move position)
+- `buildPGNFromFEN(fen)` — generates PGN with FEN header for custom starting positions
+- Modified `onDragStart` — allows piece dragging in Coach Demo mode
+- Modified `onDrop` — captures FEN before move, sends to `/api/coach/move`
+- `handleCoachDemoMove()` — async function sending moves for coaching
+- "Coach is analyzing..." indicator in chat during move evaluation
+- Updated `sendChatMessage()` to handle `board_control` in chat responses
+- Annotation panel below board shows Claude's position explanations
+
+### Issues Encountered
+- Rate limiting with 57K token book content (~30K tokens/min org limit)
+  - Expected behavior; prompt caching helps after first call
+  - Doesn't affect functionality, just requires spacing API calls during testing
+
+### Key Learnings
+- Anthropic tool calling integrates cleanly — text and tool_use blocks in same response
+- `multipv` parameter on python-chess `analyse()` gives top N moves efficiently
+- Eval loss calculation must account for moving player's perspective (same pattern as game analysis)
+- Mode-based board interaction (view-only vs interactive) keeps UX clear
+
+### Next Session
+- Phase 2 features: arrow/highlight annotations, move sequences in tool calls
+- Lesson navigation UI (step through lesson plan activities)
+- Claude adaptive Stockfish queries (deeper analysis on request)
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

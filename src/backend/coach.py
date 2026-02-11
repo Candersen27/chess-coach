@@ -10,6 +10,36 @@ from anthropic import AsyncAnthropic
 from books import BookLibrary
 from lesson import LessonManager, LessonPlan, extract_lesson_json
 
+# Tool definition for board control
+BOARD_CONTROL_TOOL = {
+    "name": "set_board_position",
+    "description": (
+        "Display a chess position on the board to demonstrate a concept, "
+        "show a position from the user's games, or illustrate a teaching point. "
+        "The position will be loaded in Coach Demo mode where the user can "
+        "interact with it."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "fen": {
+                "type": "string",
+                "description": "Position in Forsyth-Edwards Notation (FEN). Example: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'"
+            },
+            "annotation": {
+                "type": "string",
+                "description": "Explanation of what to notice about this position, what the key idea is, or what the user should try"
+            },
+            "moves": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional: Sequence of moves in SAN to demonstrate from this position. Phase 1: Leave empty."
+            }
+        },
+        "required": ["fen", "annotation"]
+    }
+}
+
 # Load .env from project root (two levels up from src/backend/)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
@@ -58,6 +88,25 @@ WHY moves are good or bad.
 
 Keep responses conversational and not too long. Ask follow-up questions to
 understand what the student needs.
+
+BOARD CONTROL CAPABILITY:
+
+You have the ability to control the chessboard during coaching conversations.
+Use the set_board_position tool to:
+- Show positions from the user's games
+- Demonstrate tactical patterns
+- Illustrate strategic concepts
+- Display positions from lesson plans
+- Show consequences of moves
+
+When you use this tool, the board will update in the user interface and switch
+to Coach Demo mode. The user can then interact with the position by making moves,
+and you'll receive those moves along with Stockfish analysis to provide coaching.
+
+The user can navigate through positions you've shown using arrow buttons.
+
+IMPORTANT: In Phase 1, leave the 'moves' array empty - only set positions,
+don't demonstrate sequences yet.
 
 When the student agrees to practice something, generate a lesson plan in this JSON format.
 Include the lesson plan JSON at the end of your message, after the marker [LESSON_PLAN].
@@ -153,17 +202,18 @@ Only generate a lesson plan when the student explicitly agrees to practice.
 
         return system_blocks
 
-    async def chat(self, message: str, conversation_history: list = None,
-                   board_context: dict = None, pattern_context: dict = None) -> dict:
-        """Send a message to the coach and get a response.
+    async def chat_with_tools(self, message: str, conversation_history: list = None,
+                              board_context: dict = None, pattern_context: dict = None) -> dict:
+        """Chat with Claude using tool calling for board control.
 
         Args:
             message: The user's message
             conversation_history: List of previous messages [{"role": ..., "content": ...}]
             board_context: Optional dict with fen, last_move, mode
+            pattern_context: Optional dict with pattern analysis data
 
         Returns:
-            Dict with "message" (str) and "suggested_action" (dict or None)
+            Dict with "message", "board_control", and "suggested_action"
         """
         messages = []
 
@@ -181,26 +231,39 @@ Only generate a lesson plan when the student explicitly agrees to practice.
 
         response = await self.client.messages.create(
             model=self.model,
-            max_tokens=2048,
+            max_tokens=4096,
+            tools=[BOARD_CONTROL_TOOL],
             system=self._get_system_prompt(board_context, pattern_context),
             messages=messages
         )
 
-        raw_text = response.content[0].text
+        # Parse response for text and tool calls
+        raw_text = ""
+        board_control = None
 
-        # Check for lesson plan in response
+        for block in response.content:
+            if block.type == "text":
+                raw_text += block.text
+            elif block.type == "tool_use" and block.name == "set_board_position":
+                board_control = {
+                    "fen": block.input["fen"],
+                    "annotation": block.input["annotation"],
+                    "moves": block.input.get("moves", [])
+                }
+
+        # Check for lesson plan in text response
         lesson_plan = None
         clean_message = raw_text
 
         plan_json = extract_lesson_json(raw_text)
         if plan_json:
-            # Split message at the marker
             marker = "[LESSON_PLAN]"
             clean_message = raw_text.split(marker)[0].strip()
             lesson_plan = self.lesson_manager.create_lesson_from_response(plan_json)
 
         result = {
             "message": clean_message,
+            "board_control": board_control,
             "suggested_action": None
         }
 
@@ -211,3 +274,31 @@ Only generate a lesson plan when the student explicitly agrees to practice.
             }
 
         return result
+
+    async def chat(self, message: str, conversation_history: list = None,
+                   board_context: dict = None, pattern_context: dict = None) -> dict:
+        """Send a message to the coach and get a response.
+
+        Wraps chat_with_tools() for backward compatibility.
+
+        Args:
+            message: The user's message
+            conversation_history: List of previous messages [{"role": ..., "content": ...}]
+            board_context: Optional dict with fen, last_move, mode
+            pattern_context: Optional dict with pattern analysis data
+
+        Returns:
+            Dict with "message" (str) and "suggested_action" (dict or None)
+        """
+        result = await self.chat_with_tools(
+            message=message,
+            conversation_history=conversation_history,
+            board_context=board_context,
+            pattern_context=pattern_context
+        )
+
+        # Return in legacy format (without board_control)
+        return {
+            "message": result["message"],
+            "suggested_action": result.get("suggested_action")
+        }

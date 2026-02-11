@@ -310,4 +310,105 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-018] Pattern Detection Priority Order
+**Date:** 2025-02-10
+**Status:** Accepted
+**Context:** When analyzing blunders, multiple tactical patterns might apply to the same position.
+**Decision:** Detect patterns in priority order (hanging piece → knight fork → pin → back rank). First match wins — each blunder gets exactly one pattern label.
+**Rationale:**
+- Prevents double-counting the same mistake under multiple categories
+- Prioritizes the most obvious/fundamental mistake cause
+- Cleaner pattern summary, more accurate recommendation generation
+**Consequences:**
+- A blunder caused by a pin that also leaves a piece hanging will only be tagged as hanging piece
+- Adding new detectors requires choosing their priority position in the list
+
+---
+
+### [DECISION-019] Username Filtering for Move Analysis
+**Date:** 2025-02-10
+**Status:** Accepted
+**Context:** Batch analysis can include games where user plays as White or Black. Need to decide whose moves to analyze.
+**Decision:** When username is provided, parse PGN headers to determine user's color, then analyze only their moves for accuracy calculation and pattern detection. Opponent's moves are ignored.
+**Rationale:**
+- Analyzing opponent's mistakes skews the user's actual performance data
+- Leads to incorrect recommendations if opponent blunders are counted
+- PGN headers from Chess.com exports reliably contain player names
+**Consequences:**
+- More accurate accuracy percentages and recommendations
+- Username matching is case-insensitive substring match (handles display name variations)
+- If username not provided, both sides are analyzed (fallback behavior)
+
+---
+
+### [DECISION-020] Session-Level Pattern Persistence via localStorage
+**Date:** 2025-02-10
+**Status:** Accepted
+**Context:** Pattern analysis takes 30-60s for 10 games. Users shouldn't re-analyze on every page refresh.
+**Decision:** Store batch analysis results in browser localStorage. Auto-save after analysis completes, auto-load on page load. Provide export/import for sharing/archiving.
+**Rationale:**
+- Improves UX without requiring database setup in Phase 2
+- Aligns with existing "frontend manages state" architecture (DECISION-010)
+- Export/import enables sharing analysis between devices or sessions
+**Consequences:**
+- Analysis persists across browser sessions until manually cleared
+- Subject to localStorage size limits (~5MB, sufficient for current data)
+- Will migrate to database persistence in Phase 3
+
+---
+
+### [DECISION-021] Tool Calling for Board Control
+**Date:** 2025-02-11
+**Status:** Accepted
+**Context:** Need Claude to control the chessboard during coaching. Options: XML tags in response, JSON blocks, or Anthropic native tool calling.
+**Decision:** Use Anthropic's native tool calling with a `set_board_position` tool.
+**Rationale:**
+- Most robust approach — structured input/output, no brittle parsing
+- Native Claude feature, well-documented and reliable
+- Extensible — can add more tools (arrows, sequences) in Phase 2
+- Frontend receives structured board control data alongside text
+**Consequences:**
+- `chat_with_tools()` replaces direct API calls in coach.py
+- Response parsing iterates content blocks (text + tool_use)
+- Backward compatibility maintained via wrapper `chat()` method
+- Tool calling works alongside existing lesson plan extraction
+
+---
+
+### [DECISION-022] Coach Demo Mode (Two-Mode Board)
+**Date:** 2025-02-11
+**Status:** Accepted
+**Context:** Users need to both view their own games and interact with positions Claude demonstrates.
+**Decision:** Two distinct modes — "My Game" (view-only) and "Coach Demo" (interactive) — with state preservation when switching.
+**Rationale:**
+- Clear mental model: users always know which context they're in
+- No accidental modification of uploaded game analysis
+- State preserved when switching (no data loss)
+- Natural workflow: analyze → coach demonstrates → back to analyze
+**Consequences:**
+- Mode toggle UI above the board
+- `gameState` object tracks both modes independently
+- `onDragStart`/`onDrop` check active mode before allowing moves
+- Coach Demo auto-activates when Claude uses set_board_position tool
+
+---
+
+### [DECISION-023] Stockfish + Claude Hybrid Coaching for User Moves
+**Date:** 2025-02-11
+**Status:** Accepted
+**Context:** When users make moves in Coach Demo mode, need to provide accurate and natural coaching feedback.
+**Decision:** Pipeline: User move → Stockfish evaluates (before/after) → Claude coaches with engine data.
+**Rationale:**
+- Stockfish provides tactical accuracy (catches all tactics)
+- Claude provides natural language coaching (explains why)
+- Same pattern as existing game analysis, applied real-time
+- Depth 15 keeps response time under 500ms for Stockfish portion
+**Consequences:**
+- New `/api/coach/move` endpoint handles the pipeline
+- `evaluate_move()` engine method provides before/after analysis
+- Move classification reuses existing thresholds (DECISION-011)
+- Claude can optionally show new positions via tool calling in response
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

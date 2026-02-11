@@ -173,6 +173,14 @@ class ChatResponse(BaseModel):
     """Response model for chat with coach."""
     message: str
     suggested_action: Optional[dict] = None
+    board_control: Optional[dict] = None
+
+
+class CoachMoveRequest(BaseModel):
+    """Request model for coaching a user's move in Coach Demo mode."""
+    fen: str = Field(..., description="FEN of the position BEFORE the move")
+    move: str = Field(..., description="Move in Standard Algebraic Notation (e.g., 'Nf6')")
+    context: dict = Field(default_factory=dict, description="Conversation context")
 
 
 # Endpoints
@@ -352,13 +360,13 @@ async def analyze_batch(request: BatchAnalysisRequest):
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat_with_coach(request: ChatRequest):
-    """Chat with the chess coach.
+    """Chat with the chess coach (with board control via tools).
 
     Args:
         request: Chat request with message, conversation history, and board context
 
     Returns:
-        Coach's response message
+        Coach's response with optional board_control for position display
 
     Raises:
         HTTPException: 503 if coach not initialized, 500 for API errors
@@ -370,7 +378,7 @@ async def chat_with_coach(request: ChatRequest):
         history = [{"role": m.role, "content": m.content} for m in request.conversation_history]
         board_ctx = request.board_context.model_dump() if request.board_context else None
 
-        response = await chess_coach.chat(
+        response = await chess_coach.chat_with_tools(
             message=request.message,
             conversation_history=history,
             board_context=board_ctx,
@@ -380,6 +388,68 @@ async def chat_with_coach(request: ChatRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
+
+
+@app.post("/api/coach/move")
+async def coach_move_endpoint(request: CoachMoveRequest):
+    """Handle user move in Coach Demo mode.
+
+    Gets Stockfish analysis of the move, then asks Claude to provide
+    coaching feedback with the engine data as context.
+
+    Args:
+        request: CoachMoveRequest with FEN (before move), move in SAN, and context
+
+    Returns:
+        Coaching response with optional board_control and Stockfish evaluation
+    """
+    if chess_coach is None:
+        raise HTTPException(status_code=503, detail="Chess coach not available (check API key)")
+
+    try:
+        # Get Stockfish analysis of the move
+        move_analysis = await chess_engine.evaluate_move(
+            fen=request.fen,
+            move_san=request.move,
+            depth=15
+        )
+
+        # Build coaching prompt with Stockfish context
+        best_move_info = ""
+        if move_analysis["best_move"]:
+            best_move_info = f"- Best move was: {move_analysis['best_move']['san']} (eval: {move_analysis['best_move']['eval']:.2f})"
+
+        coaching_prompt = (
+            f"The user just played: {request.move}\n\n"
+            f"Stockfish analysis:\n"
+            f"- Evaluation before: {move_analysis['eval_before']:.2f}\n"
+            f"- Evaluation after: {move_analysis['eval_after']:.2f}\n"
+            f"- Evaluation loss: {move_analysis['eval_loss']:.2f}\n"
+            f"- Move classification: {move_analysis['classification']}\n"
+            f"{best_move_info}\n\n"
+            f"Current context: {request.context.get('current_demonstration', 'General coaching')}\n\n"
+            f"Provide coaching feedback on this move. If it's a mistake or blunder, "
+            f"use set_board_position to show the consequences or a better alternative."
+        )
+
+        # Get Claude response with tool calling
+        response = await chess_coach.chat_with_tools(
+            message=coaching_prompt,
+            conversation_history=request.context.get("conversation_history", []),
+        )
+
+        return {
+            "message": response["message"],
+            "board_control": response.get("board_control"),
+            "stockfish_eval": move_analysis,
+            "status": "success"
+        }
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Coach move failed: {str(e)}")
 
 
 @app.get("/api/books")

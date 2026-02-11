@@ -157,6 +157,122 @@ class ChessEngine:
             "fen_after": fen_after
         }
 
+    async def get_coaching_context(self, fen: str, depth: int = 15) -> Dict[str, Any]:
+        """Get comprehensive analysis for coaching feedback.
+
+        Args:
+            fen: Position in FEN notation
+            depth: Search depth (default 15 for balance of speed/accuracy)
+
+        Returns:
+            Dictionary containing:
+                - evaluation: float (in pawns, from White's perspective)
+                - top_moves: list of {move, san, eval}
+                - mate_in: int or None
+        """
+        if self.engine is None:
+            raise RuntimeError("Engine not started. Call start() first.")
+
+        try:
+            board = chess.Board(fen)
+        except ValueError as e:
+            raise ValueError(f"Invalid FEN: {str(e)}")
+
+        # Get top 3 moves using multipv
+        infos = await self.engine.analyse(
+            board,
+            chess.engine.Limit(depth=depth),
+            multipv=3
+        )
+
+        # Extract overall evaluation from best line
+        eval_value = 0.0
+        mate_in = None
+
+        if infos:
+            score = infos[0]['score'].white()
+            if score.is_mate():
+                mate_in = score.mate()
+                eval_value = 10000.0 if score.mate() > 0 else -10000.0
+            else:
+                eval_value = score.score() / 100.0
+
+        # Format top moves with SAN notation
+        top_moves = []
+        for info in infos:
+            if info.get('pv') and len(info['pv']) > 0:
+                move = info['pv'][0]
+                move_score = info['score'].white()
+
+                if move_score.is_mate():
+                    move_eval = 10000.0 if move_score.mate() > 0 else -10000.0
+                else:
+                    move_eval = move_score.score() / 100.0
+
+                top_moves.append({
+                    "move": move.uci(),
+                    "san": board.san(move),
+                    "eval": move_eval
+                })
+
+        return {
+            "evaluation": eval_value,
+            "top_moves": top_moves,
+            "mate_in": mate_in
+        }
+
+    async def evaluate_move(self, fen: str, move_san: str, depth: int = 15) -> Dict[str, Any]:
+        """Evaluate a specific move with before/after analysis.
+
+        Args:
+            fen: Position BEFORE the move (FEN notation)
+            move_san: Move in Standard Algebraic Notation (e.g., "Nf6")
+            depth: Search depth
+
+        Returns:
+            Dictionary containing eval_before, eval_after, eval_loss,
+            classification, best_move, and alternative_moves
+        """
+        # Get position evaluation before move
+        context_before = await self.get_coaching_context(fen, depth)
+
+        # Apply move to get new position
+        board = chess.Board(fen)
+        try:
+            move = board.parse_san(move_san)
+            board.push(move)
+        except ValueError as e:
+            raise ValueError(f"Invalid move {move_san}: {e}")
+
+        # Get position evaluation after move
+        context_after = await self.get_coaching_context(board.fen(), depth)
+
+        # Calculate eval loss from the moving player's perspective
+        # Both evaluations are from White's perspective (standard convention)
+        eval_before = context_before["evaluation"]
+        eval_after = context_after["evaluation"]
+        moving_color = chess.Board(fen).turn
+
+        if moving_color == chess.WHITE:
+            # White moved: loss = how much White's advantage decreased
+            eval_loss_pawns = eval_before - eval_after
+        else:
+            # Black moved: loss = how much Black's advantage decreased
+            eval_loss_pawns = eval_after - eval_before
+
+        # Classify using existing thresholds (centipawns)
+        cp_loss = eval_loss_pawns * 100
+        classification = classify_move(cp_loss)
+
+        return {
+            "eval_before": round(eval_before, 2),
+            "eval_after": round(eval_after, 2),
+            "eval_loss": round(eval_loss_pawns, 2),
+            "classification": classification,
+            "best_move": context_before["top_moves"][0] if context_before["top_moves"] else None,
+            "alternative_moves": context_before["top_moves"]
+        }
+
     async def analyze_game(self, pgn: str, depth: int = 15) -> Dict[str, Any]:
         """Analyze all moves in a PGN game.
 

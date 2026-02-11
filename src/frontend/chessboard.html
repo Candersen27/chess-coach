@@ -885,6 +885,69 @@
         .export-controls button:hover {
             background-color: #616161;
         }
+
+        /* Mode Toggle */
+        .mode-toggle {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            justify-content: center;
+        }
+
+        .mode-btn {
+            flex: 0 1 auto;
+            padding: 8px 16px;
+            border: 2px solid #ccc;
+            background: white;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s;
+            color: #333;
+        }
+
+        .mode-btn.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        .mode-btn:hover:not(.active) {
+            background: #f0f0f0;
+        }
+
+        .mode-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Coach Demo annotation */
+        .annotation-panel {
+            background-color: #fff8e1;
+            border: 1px solid #ffcc02;
+            border-radius: 4px;
+            padding: 10px 12px;
+            margin-top: 8px;
+            font-size: 13px;
+            color: #5d4037;
+            display: none;
+        }
+
+        .annotation-panel.visible {
+            display: block;
+        }
+
+        /* Coach thinking indicator in chat */
+        .coach-thinking-indicator {
+            background: #fff3cd;
+            color: #856404;
+            font-style: italic;
+            padding: 10px 12px;
+            border-radius: 8px;
+            align-self: flex-start;
+            max-width: 85%;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -895,7 +958,14 @@
 
         <div class="main-content">
             <div class="left-column">
+                <div class="mode-toggle">
+                    <button id="myGameMode" class="mode-btn active" onclick="switchToMyGame()">My Game</button>
+                    <button id="coachDemoMode" class="mode-btn" onclick="switchToCoachDemoManual()" disabled>Coach Demo</button>
+                </div>
+
                 <div id="board"></div>
+
+                <div id="annotationPanel" class="annotation-panel"></div>
 
                 <div class="controls">
                     <div class="file-input-wrapper">
@@ -1143,7 +1213,24 @@
                     return true;
                 }
 
-                // Only allow dragging if we're at the current position (end of history)
+                // Coach Demo mode: allow dragging for interactive exploration
+                if (typeof gameState !== 'undefined' && gameState.activeMode === 'coachDemo') {
+                    // Don't allow moves while waiting for coach response
+                    if (gameState.isWaitingForCoach) return false;
+
+                    // Don't allow moves if game is over
+                    if (game.game_over()) return false;
+
+                    // Only pick up pieces for the side to move
+                    if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+                        (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+                        return false;
+                    }
+
+                    return true;
+                }
+
+                // My Game mode: only allow dragging at end of history
                 if (currentMoveIndex < moveHistory.length - 1) {
                     return false;
                 }
@@ -1164,11 +1251,42 @@
                     return onDropPiece(source, target);
                 }
 
-                // Normal mode: Try to make the move
+                // Coach Demo mode: allow interactive moves and send to coach
+                if (typeof gameState !== 'undefined' && gameState.activeMode === 'coachDemo') {
+                    // Capture FEN before the move (needed for evaluation)
+                    const fenBefore = game.fen();
+
+                    const move = game.move({
+                        from: source,
+                        to: target,
+                        promotion: 'q'
+                    });
+
+                    if (move === null) return 'snapback';
+
+                    // Update board display
+                    board.position(game.fen());
+
+                    // Add to move history for navigation
+                    moveHistory = moveHistory.slice(0, currentMoveIndex + 1);
+                    moveHistory.push({
+                        move: move,
+                        fen: game.fen()
+                    });
+                    currentMoveIndex++;
+                    updateDisplay();
+                    updateButtons();
+
+                    // Send move to coach for feedback
+                    handleCoachDemoMove(fenBefore, move.san);
+                    return;
+                }
+
+                // My Game mode: normal move behavior
                 const move = game.move({
                     from: source,
                     to: target,
-                    promotion: 'q' // Always promote to queen for simplicity
+                    promotion: 'q'
                 });
 
                 // Illegal move
@@ -2256,6 +2374,11 @@
                 removeChatMessage(thinkingId);
                 addChatMessage('assistant', data.message);
 
+                // Handle board control if Claude demonstrated a position
+                if (data.board_control) {
+                    switchToCoachDemo(data.board_control);
+                }
+
                 // Handle lesson plan if present
                 if (data.suggested_action && data.suggested_action.type === 'start_lesson') {
                     currentLessonPlan = data.suggested_action.lesson_plan;
@@ -2303,6 +2426,7 @@
         }
 
         function getCurrentMode() {
+            if (gameState.activeMode === 'coachDemo') return 'coachDemo';
             if (currentLessonPlan) return 'lesson';
             if (typeof isPlaying !== 'undefined' && isPlaying) return 'play';
             const analysisPanel = document.getElementById('analysisPanel');
@@ -2348,6 +2472,221 @@
         $(document).ready(function() {
             initChat();
         });
+
+        // ===== Board Control: Game State Management (Tasks 6-10) =====
+
+        const gameState = {
+            // My Game mode state
+            myGame: {
+                pgn: "",
+                currentMove: -1,
+                fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+            },
+            // Coach Demo mode state
+            coachDemo: {
+                pgn: "",
+                currentMove: -1,
+                positions: [],   // [{fen, annotation}, ...]
+                fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                isInteractive: true
+            },
+            // Active mode
+            activeMode: "myGame",  // "myGame" or "coachDemo"
+            isWaitingForCoach: false
+        };
+
+        /**
+         * Build a PGN string with a custom starting position via FEN header.
+         * chess.js loads this and starts from the given position.
+         */
+        function buildPGNFromFEN(fen) {
+            return [
+                '[Event "Coach Demonstration"]',
+                '[Site "AI Chess Coach"]',
+                '[FEN "' + fen + '"]',
+                '[SetUp "1"]',
+                '',
+                '*'
+            ].join('\n');
+        }
+
+        /**
+         * Switch to Coach Demo mode with board control data from Claude.
+         * Called automatically when Claude uses the set_board_position tool.
+         */
+        function switchToCoachDemo(boardControl) {
+            // Save current My Game state if we're switching from it
+            if (gameState.activeMode === "myGame") {
+                gameState.myGame.pgn = chessBoard.getPGN();
+                gameState.myGame.fen = chessBoard.getCurrentFEN();
+                // Save current move index via the display (we don't have direct access)
+                const moveNumText = document.getElementById('moveNumber').textContent;
+                const match = moveNumText.match(/^(\d+)/);
+                gameState.myGame.currentMove = match ? parseInt(match[1]) - 1 : -1;
+            }
+
+            // Set up Coach Demo state
+            gameState.coachDemo.fen = boardControl.fen;
+            gameState.coachDemo.positions.push({
+                fen: boardControl.fen,
+                annotation: boardControl.annotation
+            });
+
+            // Switch mode
+            gameState.activeMode = "coachDemo";
+
+            // Update UI toggle buttons
+            document.getElementById('myGameMode').classList.remove('active');
+            document.getElementById('coachDemoMode').classList.add('active');
+            document.getElementById('coachDemoMode').disabled = false;
+
+            // Load the position on the board
+            chessBoard.setPosition(boardControl.fen);
+
+            // Show annotation
+            showAnnotation(boardControl.annotation);
+        }
+
+        /**
+         * Manual switch to Coach Demo (clicking the button).
+         * Only available if there are coach positions to show.
+         */
+        function switchToCoachDemoManual() {
+            if (gameState.coachDemo.positions.length === 0) return;
+
+            // Save My Game state
+            if (gameState.activeMode === "myGame") {
+                gameState.myGame.pgn = chessBoard.getPGN();
+                gameState.myGame.fen = chessBoard.getCurrentFEN();
+                const moveNumText = document.getElementById('moveNumber').textContent;
+                const match = moveNumText.match(/^(\d+)/);
+                gameState.myGame.currentMove = match ? parseInt(match[1]) - 1 : -1;
+            }
+
+            gameState.activeMode = "coachDemo";
+
+            // Update toggle buttons
+            document.getElementById('myGameMode').classList.remove('active');
+            document.getElementById('coachDemoMode').classList.add('active');
+
+            // Restore last coach demo position
+            const lastPos = gameState.coachDemo.positions[gameState.coachDemo.positions.length - 1];
+            chessBoard.setPosition(lastPos.fen);
+            showAnnotation(lastPos.annotation);
+        }
+
+        /**
+         * Switch back to My Game mode. Restores the user's game state.
+         */
+        function switchToMyGame() {
+            if (gameState.activeMode === "myGame") return;
+
+            gameState.activeMode = "myGame";
+
+            // Update toggle buttons
+            document.getElementById('coachDemoMode').classList.remove('active');
+            document.getElementById('myGameMode').classList.add('active');
+
+            // Hide annotation
+            hideAnnotation();
+
+            // Restore My Game state
+            if (gameState.myGame.pgn) {
+                chessBoard.loadPGN(gameState.myGame.pgn);
+                // Navigate to the saved move
+                if (gameState.myGame.currentMove >= 0) {
+                    chessBoard.goToStart();
+                    for (let i = 0; i <= gameState.myGame.currentMove; i++) {
+                        chessBoard.nextMove();
+                    }
+                }
+            } else {
+                chessBoard.setPosition(gameState.myGame.fen);
+            }
+        }
+
+        function showAnnotation(text) {
+            const panel = document.getElementById('annotationPanel');
+            panel.textContent = text;
+            panel.classList.add('visible');
+        }
+
+        function hideAnnotation() {
+            const panel = document.getElementById('annotationPanel');
+            panel.classList.remove('visible');
+        }
+
+        /**
+         * Show "Coach is analyzing..." indicator in chat.
+         */
+        function showCoachThinking() {
+            const messagesDiv = document.getElementById('chatMessages');
+            const indicator = document.createElement('div');
+            indicator.id = 'coach-thinking';
+            indicator.className = 'coach-thinking-indicator';
+            indicator.textContent = 'Coach is analyzing your move...';
+            messagesDiv.appendChild(indicator);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function hideCoachThinking() {
+            const el = document.getElementById('coach-thinking');
+            if (el) el.remove();
+        }
+
+        /**
+         * Handle a user move in Coach Demo mode.
+         * Sends FEN (before move) + move SAN to the backend for coaching.
+         */
+        async function handleCoachDemoMove(fenBefore, moveSan) {
+            gameState.isWaitingForCoach = true;
+            showCoachThinking();
+
+            try {
+                const response = await fetch(API_BASE_URL + '/api/coach/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fen: fenBefore,
+                        move: moveSan,
+                        context: {
+                            conversation_history: conversationHistory,
+                            current_demonstration: gameState.coachDemo.positions.length > 0
+                                ? gameState.coachDemo.positions[gameState.coachDemo.positions.length - 1].annotation
+                                : 'General coaching'
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || 'Failed to get coaching response');
+                }
+
+                const data = await response.json();
+
+                hideCoachThinking();
+
+                // Add coach response to chat
+                addChatMessage('assistant', data.message);
+
+                // Update conversation history
+                conversationHistory.push({ role: 'user', content: 'I played: ' + moveSan });
+                conversationHistory.push({ role: 'assistant', content: data.message });
+
+                // If coach demonstrates a new position, update the board
+                if (data.board_control) {
+                    switchToCoachDemo(data.board_control);
+                }
+
+            } catch (error) {
+                hideCoachThinking();
+                console.error('Coach move error:', error);
+                addChatMessage('assistant', 'Sorry, I had trouble analyzing that move. Please try again.');
+            } finally {
+                gameState.isWaitingForCoach = false;
+            }
+        }
     </script>
 </body>
 </html>

@@ -2,11 +2,17 @@
 FastAPI backend for chess analysis using Stockfish.
 """
 
+import logging
+import traceback
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger(__name__)
+
+from anthropic import RateLimitError
 
 from engine import ChessEngine
 from coach import ChessCoach
@@ -226,7 +232,7 @@ async def analyze_position(request: AnalysisRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        # Engine or other errors
+        logger.error("Analysis failed:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 
@@ -257,7 +263,7 @@ async def get_engine_move(request: MoveRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
-        # Engine or other errors
+        logger.error("Move generation failed:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Move generation failed: {str(e)}")
 
 
@@ -386,7 +392,12 @@ async def chat_with_coach(request: ChatRequest):
         )
         return response
 
+    except RateLimitError as e:
+        logger.warning("Chat rate limited: %s", str(e))
+        raise HTTPException(status_code=429, detail="Rate limit reached. Please wait a moment and try again.")
+
     except Exception as e:
+        logger.error("Chat failed:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Chat failed: {str(e)}")
 
 
@@ -432,10 +443,11 @@ async def coach_move_endpoint(request: CoachMoveRequest):
             f"use set_board_position to show the consequences or a better alternative."
         )
 
-        # Get Claude response with tool calling
+        # Get Claude response with tool calling (skip book — move coaching uses Stockfish data)
         response = await chess_coach.chat_with_tools(
             message=coaching_prompt,
             conversation_history=request.context.get("conversation_history", []),
+            include_book=False,
         )
 
         return {
@@ -448,7 +460,12 @@ async def coach_move_endpoint(request: CoachMoveRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    except RateLimitError as e:
+        logger.warning("Coach move rate limited: %s", str(e))
+        raise HTTPException(status_code=429, detail="Rate limit reached. Please wait a moment and try again.")
+
     except Exception as e:
+        logger.error("Coach move failed:\n%s", traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Coach move failed: {str(e)}")
 
 

@@ -51,7 +51,7 @@ class ChessCoach:
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
             raise ValueError("ANTHROPIC_API_KEY not found in environment")
-        self.client = AsyncAnthropic(api_key=api_key)
+        self.client = AsyncAnthropic(api_key=api_key, max_retries=2)
         self.model = "claude-sonnet-4-20250514"
 
         # Load chess books
@@ -66,7 +66,8 @@ class ChessCoach:
         # Lesson plan manager
         self.lesson_manager = LessonManager()
 
-    def _get_system_prompt(self, board_context: dict = None, pattern_context: dict = None) -> list:
+    def _get_system_prompt(self, board_context: dict = None, pattern_context: dict = None,
+                           include_book: bool = True) -> list:
         """Build the system prompt with book content and board context.
 
         Returns a list of content blocks for prompt caching support.
@@ -130,7 +131,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
         # Build system prompt as content blocks for caching
         system_blocks = []
 
-        if self.book_content:
+        if include_book and self.book_content:
             # Book content block — marked for prompt caching
             system_blocks.append({
                 "type": "text",
@@ -203,7 +204,8 @@ Only generate a lesson plan when the student explicitly agrees to practice.
         return system_blocks
 
     async def chat_with_tools(self, message: str, conversation_history: list = None,
-                              board_context: dict = None, pattern_context: dict = None) -> dict:
+                              board_context: dict = None, pattern_context: dict = None,
+                              include_book: bool = True) -> dict:
         """Chat with Claude using tool calling for board control.
 
         Args:
@@ -233,7 +235,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
             model=self.model,
             max_tokens=4096,
             tools=[BOARD_CONTROL_TOOL],
-            system=self._get_system_prompt(board_context, pattern_context),
+            system=self._get_system_prompt(board_context, pattern_context, include_book),
             messages=messages
         )
 

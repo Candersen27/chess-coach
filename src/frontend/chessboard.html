@@ -1033,6 +1033,11 @@
                         <button onclick="startGameAsBlack()">New Game as Black</button>
                     </div>
 
+                    <div id="gameActions" class="play-buttons" style="display: none;">
+                        <button onclick="offerDraw()" id="drawBtn" style="background-color: #f59e0b;">Draw</button>
+                        <button onclick="resignGame()" id="resignBtn" style="background-color: #c62828;">Resign</button>
+                    </div>
+
                     <div id="gameStatus" class="game-status"></div>
                 </div>
 
@@ -1400,6 +1405,10 @@
                 board.flip();
             }
 
+            function orient(color) {
+                board.orientation(color);
+            }
+
             function resetBoard() {
                 game.reset();
                 board.start();
@@ -1539,6 +1548,18 @@
                 return tempGame.pgn();
             }
 
+            function getGameStatus() {
+                return {
+                    isGameOver: game.game_over(),
+                    inCheckmate: game.in_checkmate(),
+                    inStalemate: game.in_stalemate(),
+                    inThreefoldRepetition: game.in_threefold_repetition(),
+                    inDraw: game.in_draw(),
+                    insufficientMaterial: game.insufficient_material(),
+                    turn: game.turn()
+                };
+            }
+
             // Public interface
             return {
                 init: init,
@@ -1550,10 +1571,12 @@
                 nextMove: nextMove,
                 goToEnd: goToEnd,
                 flipBoard: flipBoard,
+                orient: orient,
                 resetBoard: resetBoard,
                 handleFileSelect: handleFileSelect,
                 getCurrentFEN: getCurrentFEN,
-                getPGN: getPGN
+                getPGN: getPGN,
+                getGameStatus: getGameStatus
             };
         })();
 
@@ -1703,11 +1726,13 @@
         function startGameAsWhite() {
             // Reset game
             chessBoard.resetBoard();
+            chessBoard.orient('white');
             isPlaying = true;
             playerColor = 'white';
             isPlayerTurn = true;
 
             updateGameStatus("Your turn (White)");
+            document.getElementById('gameActions').style.display = 'flex';
 
             // Hide analysis panel
             document.getElementById('analysisPanel').classList.remove('visible');
@@ -1716,11 +1741,13 @@
         function startGameAsBlack() {
             // Reset game
             chessBoard.resetBoard();
+            chessBoard.orient('black');
             isPlaying = true;
             playerColor = 'black';
             isPlayerTurn = false;
 
             updateGameStatus("Coach thinking...");
+            document.getElementById('gameActions').style.display = 'flex';
 
             // Hide analysis panel
             document.getElementById('analysisPanel').classList.remove('visible');
@@ -1804,18 +1831,18 @@
         }
 
         function checkGameOver() {
-            const fen = chessBoard.getCurrentFEN();
-            const game = new Chess(fen);
+            const status = chessBoard.getGameStatus();
 
-            if (game.in_checkmate()) {
-                // Whoever just moved wins (it's now the other player's turn)
-                const winner = game.turn() === 'w' ? 'Black' : 'White';
+            if (status.inCheckmate) {
+                const winner = status.turn === 'w' ? 'Black' : 'White';
                 return `Checkmate! ${winner} wins!`;
-            } else if (game.in_stalemate()) {
-                return 'Stalemate! Draw.';
-            } else if (game.in_threefold_repetition()) {
+            } else if (status.inStalemate) {
+                return 'Draw by stalemate.';
+            } else if (status.inThreefoldRepetition) {
                 return 'Draw by threefold repetition.';
-            } else if (game.in_draw()) {
+            } else if (status.insufficientMaterial) {
+                return 'Draw by insufficient material.';
+            } else if (status.inDraw) {
                 return 'Draw!';
             }
 
@@ -1826,6 +1853,18 @@
             isPlaying = false;
             isPlayerTurn = false;
             updateGameStatus(result, "game-over");
+            document.getElementById('gameActions').style.display = 'none';
+        }
+
+        function resignGame() {
+            if (!isPlaying) return;
+            const winner = playerColor === 'white' ? 'Black' : 'White';
+            endGame(`${winner} wins by resignation.`);
+        }
+
+        function offerDraw() {
+            if (!isPlaying) return;
+            endGame('Draw by agreement.');
         }
 
         function updateGameStatus(message, className = "your-turn") {
@@ -2540,6 +2579,9 @@
 
             // Load the position on the board
             chessBoard.setPosition(boardControl.fen);
+
+            // Orient board to the appropriate perspective
+            chessBoard.orient(boardControl.orientation || 'white');
 
             // Show annotation
             showAnnotation(boardControl.annotation);

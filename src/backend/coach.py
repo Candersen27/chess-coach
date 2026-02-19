@@ -34,6 +34,11 @@ BOARD_CONTROL_TOOL = {
                 "type": "array",
                 "items": {"type": "string"},
                 "description": "Optional: Sequence of moves in SAN to demonstrate from this position. Phase 1: Leave empty."
+            },
+            "orientation": {
+                "type": "string",
+                "enum": ["white", "black"],
+                "description": "Which color's perspective to show the board from. Use 'black' when the position is a puzzle or exercise where black is to move. Defaults to 'white'."
             }
         },
         "required": ["fen", "annotation"]
@@ -250,7 +255,8 @@ Only generate a lesson plan when the student explicitly agrees to practice.
                 board_control = {
                     "fen": block.input["fen"],
                     "annotation": block.input["annotation"],
-                    "moves": block.input.get("moves", [])
+                    "moves": block.input.get("moves", []),
+                    "orientation": block.input.get("orientation", "white")
                 }
 
         # Check for lesson plan in text response

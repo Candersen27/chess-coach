@@ -11,6 +11,27 @@ from books import BookLibrary
 from lesson import LessonManager, LessonPlan, extract_lesson_json
 
 # Tool definition for board control
+START_GAME_TOOL = {
+    "name": "start_game",
+    "description": (
+        "Start a Play vs Coach game when the user wants to play a game against you. "
+        "The game will be played on the board with Stockfish providing the moves. "
+        "Use this when the user says things like 'let's play a game', "
+        "'I want to play as black', etc."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "player_color": {
+                "type": "string",
+                "enum": ["white", "black"],
+                "description": "The color the player wants to play as."
+            }
+        },
+        "required": ["player_color"]
+    }
+}
+
 BOARD_CONTROL_TOOL = {
     "name": "set_board_position",
     "description": (
@@ -157,6 +178,8 @@ Only generate a lesson plan when the student explicitly agrees to practice.
                 context_text += f"\n- Last move: {board_context['last_move']}"
             if board_context.get('mode'):
                 context_text += f"\n- Current mode: {board_context['mode']}"
+            if board_context.get('pgn'):
+                context_text += f"\n- Game notation (PGN): {board_context['pgn']}"
             system_blocks.append({
                 "type": "text",
                 "text": context_text,
@@ -239,7 +262,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
         response = await self.client.messages.create(
             model=self.model,
             max_tokens=4096,
-            tools=[BOARD_CONTROL_TOOL],
+            tools=[BOARD_CONTROL_TOOL, START_GAME_TOOL],
             system=self._get_system_prompt(board_context, pattern_context, include_book),
             messages=messages
         )
@@ -247,6 +270,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
         # Parse response for text and tool calls
         raw_text = ""
         board_control = None
+        game_action = None
 
         for block in response.content:
             if block.type == "text":
@@ -257,6 +281,11 @@ Only generate a lesson plan when the student explicitly agrees to practice.
                     "annotation": block.input["annotation"],
                     "moves": block.input.get("moves", []),
                     "orientation": block.input.get("orientation", "white")
+                }
+            elif block.type == "tool_use" and block.name == "start_game":
+                game_action = {
+                    "type": "start_game",
+                    "player_color": block.input["player_color"]
                 }
 
         # Check for lesson plan in text response
@@ -269,10 +298,20 @@ Only generate a lesson plan when the student explicitly agrees to practice.
             clean_message = raw_text.split(marker)[0].strip()
             lesson_plan = self.lesson_manager.create_lesson_from_response(plan_json)
 
+        # Extract token usage
+        usage = {
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+            "cache_creation_input_tokens": getattr(response.usage, 'cache_creation_input_tokens', 0) or 0,
+            "cache_read_input_tokens": getattr(response.usage, 'cache_read_input_tokens', 0) or 0,
+        }
+
         result = {
             "message": clean_message,
             "board_control": board_control,
-            "suggested_action": None
+            "game_action": game_action,
+            "suggested_action": None,
+            "usage": usage
         }
 
         if lesson_plan:

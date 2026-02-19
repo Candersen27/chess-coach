@@ -159,6 +159,7 @@ class BoardContext(BaseModel):
     fen: Optional[str] = None
     last_move: Optional[str] = None
     mode: Optional[str] = None  # "analysis", "play", "idle"
+    pgn: Optional[str] = None
 
 
 class ChatMessage(BaseModel):
@@ -180,6 +181,8 @@ class ChatResponse(BaseModel):
     message: str
     suggested_action: Optional[dict] = None
     board_control: Optional[dict] = None
+    game_action: Optional[dict] = None
+    usage: Optional[dict] = None
 
 
 class CoachMoveRequest(BaseModel):

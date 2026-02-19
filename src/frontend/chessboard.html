@@ -63,6 +63,28 @@
             margin: 0 auto;
         }
 
+        .captured-pieces {
+            display: flex;
+            align-items: center;
+            min-height: 24px;
+            padding: 2px 0;
+            margin: 0 auto;
+            width: 500px;
+        }
+
+        .captured-pieces img {
+            height: 22px;
+            width: 22px;
+            margin-right: -4px;
+        }
+
+        .material-advantage {
+            font-size: 13px;
+            font-weight: bold;
+            color: #555;
+            margin-left: 8px;
+        }
+
         .controls {
             display: flex;
             gap: 10px;
@@ -637,6 +659,13 @@
             cursor: not-allowed;
         }
 
+        .token-usage {
+            padding: 4px 10px;
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+        }
+
         .progress-bar-container {
             width: 100%;
             height: 20px;
@@ -963,7 +992,9 @@
                     <button id="coachDemoMode" class="mode-btn" onclick="switchToCoachDemoManual()" disabled>Coach Demo</button>
                 </div>
 
+                <div id="capturedTop" class="captured-pieces"></div>
                 <div id="board"></div>
+                <div id="capturedBottom" class="captured-pieces"></div>
 
                 <div id="annotationPanel" class="annotation-panel"></div>
 
@@ -1167,6 +1198,7 @@
                                onkeypress="handleChatKeypress(event)">
                         <button id="chatSendBtn" onclick="sendChatMessage()">Send</button>
                     </div>
+                    <div id="tokenUsage" class="token-usage"></div>
                 </div>
             </div>
         </div>
@@ -1329,6 +1361,7 @@
                 }
 
                 document.getElementById('fenDisplay').textContent = game.fen();
+                updateCapturedPieces();
             }
 
             // Update button states
@@ -1403,10 +1436,12 @@
 
             function flipBoard() {
                 board.flip();
+                updateCapturedPieces();
             }
 
             function orient(color) {
                 board.orientation(color);
+                updateCapturedPieces();
             }
 
             function resetBoard() {
@@ -1560,6 +1595,67 @@
                 };
             }
 
+            const STARTING_PIECES = { P: 8, N: 2, B: 2, R: 2, Q: 1, K: 1, p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
+            const PIECE_VALUES = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+            const PIECE_ORDER = ['q', 'r', 'b', 'n', 'p'];
+
+            function updateCapturedPieces() {
+                const fen = game.fen().split(' ')[0];
+
+                // Count pieces on board
+                const onBoard = {};
+                for (const key in STARTING_PIECES) onBoard[key] = 0;
+                for (const ch of fen) {
+                    if (STARTING_PIECES.hasOwnProperty(ch)) onBoard[ch]++;
+                }
+
+                // Captured = starting - on board
+                // White captured pieces = black pieces missing from board
+                // Black captured pieces = white pieces missing from board
+                let whiteCaptured = []; // pieces white has captured (black pieces gone)
+                let blackCaptured = []; // pieces black has captured (white pieces gone)
+                let whiteMaterial = 0;
+                let blackMaterial = 0;
+
+                for (const piece of PIECE_ORDER) {
+                    const blackMissing = STARTING_PIECES[piece] - onBoard[piece]; // lowercase = black pieces
+                    for (let i = 0; i < blackMissing; i++) {
+                        whiteCaptured.push('b' + piece.toUpperCase());
+                        whiteMaterial += PIECE_VALUES[piece];
+                    }
+                    const upper = piece.toUpperCase();
+                    const whiteMissing = STARTING_PIECES[upper] - onBoard[upper];
+                    for (let i = 0; i < whiteMissing; i++) {
+                        blackCaptured.push('w' + upper);
+                        blackMaterial += PIECE_VALUES[piece];
+                    }
+                }
+
+                const advantage = whiteMaterial - blackMaterial;
+                const orientation = board.orientation();
+
+                // Top = opponent, Bottom = player (based on orientation)
+                const topPieces = orientation === 'white' ? blackCaptured : whiteCaptured;
+                const bottomPieces = orientation === 'white' ? whiteCaptured : blackCaptured;
+                const topAdvantage = orientation === 'white' ? -advantage : advantage;
+                const bottomAdvantage = orientation === 'white' ? advantage : -advantage;
+
+                renderCaptured('capturedTop', topPieces, topAdvantage);
+                renderCaptured('capturedBottom', bottomPieces, bottomAdvantage);
+            }
+
+            function renderCaptured(elementId, pieces, advantage) {
+                const el = document.getElementById(elementId);
+                let html = '';
+                for (const piece of pieces) {
+                    html += `<img src="img/chesspieces/wikipedia/${piece}.png" alt="${piece}">`;
+                }
+                if (advantage > 0) {
+                    html += `<span class="material-advantage">+${advantage}</span>`;
+                }
+                el.innerHTML = html;
+            }
+
             // Public interface
             return {
                 init: init,
@@ -1576,7 +1672,8 @@
                 handleFileSelect: handleFileSelect,
                 getCurrentFEN: getCurrentFEN,
                 getPGN: getPGN,
-                getGameStatus: getGameStatus
+                getGameStatus: getGameStatus,
+                updateCapturedPieces: updateCapturedPieces
             };
         })();
 
@@ -2352,6 +2449,19 @@
         // ===== Chat Functions =====
         let conversationHistory = [];
         let currentLessonPlan = null;
+        let sessionTokenUsage = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 };
+
+        function updateTokenUsage(usage) {
+            if (!usage) return;
+            sessionTokenUsage.input += usage.input_tokens || 0;
+            sessionTokenUsage.output += usage.output_tokens || 0;
+            sessionTokenUsage.cacheWrite += usage.cache_creation_input_tokens || 0;
+            sessionTokenUsage.cacheRead += usage.cache_read_input_tokens || 0;
+
+            const total = sessionTokenUsage.input + sessionTokenUsage.output;
+            const el = document.getElementById('tokenUsage');
+            el.textContent = `Tokens: ${total.toLocaleString()} (in: ${sessionTokenUsage.input.toLocaleString()}, out: ${sessionTokenUsage.output.toLocaleString()}, cached: ${sessionTokenUsage.cacheRead.toLocaleString()})`;
+        }
 
         function initChat() {
             addChatMessage('assistant', "Hi! I'm your chess coach. What would you like to work on today?");
@@ -2375,12 +2485,14 @@
             const thinkingId = addChatMessage('assistant', 'Thinking...', true);
 
             // Gather board context
+            const pgn = chessBoard.getPGN();
             const boardContext = {
                 fen: chessBoard.getCurrentFEN(),
                 last_move: document.getElementById('moveNotation').textContent !== '-'
                     ? document.getElementById('moveNotation').textContent
                     : null,
-                mode: getCurrentMode()
+                mode: getCurrentMode(),
+                pgn: pgn || null
             };
 
             try {
@@ -2416,11 +2528,23 @@
                     switchToCoachDemo(data.board_control);
                 }
 
+                // Handle game action if Claude wants to start a game
+                if (data.game_action && data.game_action.type === 'start_game') {
+                    if (data.game_action.player_color === 'black') {
+                        startGameAsBlack();
+                    } else {
+                        startGameAsWhite();
+                    }
+                }
+
                 // Handle lesson plan if present
                 if (data.suggested_action && data.suggested_action.type === 'start_lesson') {
                     currentLessonPlan = data.suggested_action.lesson_plan;
                     displayLessonPlan(currentLessonPlan);
                 }
+
+                // Update token usage display
+                updateTokenUsage(data.usage);
 
                 // Update conversation history
                 conversationHistory.push({ role: 'user', content: message });

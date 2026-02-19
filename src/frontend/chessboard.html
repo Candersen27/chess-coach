@@ -1959,9 +1959,53 @@
             endGame(`${winner} wins by resignation.`);
         }
 
-        function offerDraw() {
+        async function offerDraw() {
             if (!isPlaying) return;
-            endGame('Draw by agreement.');
+
+            const drawBtn = document.getElementById('drawBtn');
+            drawBtn.disabled = true;
+            updateGameStatus("Evaluating draw offer...", "coach-thinking");
+
+            try {
+                const fen = chessBoard.getCurrentFEN();
+                const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fen: fen, depth: 15 })
+                });
+
+                if (!response.ok) throw new Error('Analysis failed');
+
+                const data = await response.json();
+                const eval_ = data.evaluation;
+                const computerColor = playerColor === 'white' ? 'black' : 'white';
+
+                // Accept draw if position is equal or worse for computer
+                // Eval is from white's perspective: positive = good for white
+                let computerAdvantage;
+                if (eval_.type === 'mate') {
+                    computerAdvantage = computerColor === 'white' ? eval_.value : -eval_.value;
+                } else {
+                    computerAdvantage = computerColor === 'white' ? eval_.value : -eval_.value;
+                }
+
+                if (computerAdvantage <= 0) {
+                    endGame('Draw by agreement.');
+                } else {
+                    updateGameStatus("Draw declined! Game continues.", "your-turn");
+                    setTimeout(() => {
+                        if (isPlaying) {
+                            const turn = isPlayerTurn ? 'Your' : "Coach's";
+                            updateGameStatus(`${turn} turn (${playerColor === 'white' ? 'White' : 'Black'})`, "your-turn");
+                        }
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Draw evaluation failed:', error);
+                updateGameStatus("Error evaluating draw. Try again.", "game-over");
+            } finally {
+                drawBtn.disabled = false;
+            }
         }
 
         function updateGameStatus(message, className = "your-turn") {

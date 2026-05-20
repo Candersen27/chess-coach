@@ -2,6 +2,8 @@
 
 An AI-powered chess coaching platform that lets you analyze games with Stockfish, play against an adjustable-difficulty opponent, and have coaching conversations with Claude (engine analysis + LLM explanation via native tool calling).
 
+**🔗 Live demo: [candersen-chess-coach.fly.dev](https://candersen-chess-coach.fly.dev/)** — Stockfish features are free; Claude chat coaching runs on a daily demo budget, with a bring-your-own-key option when it's used up.
+
 ## Quick Start
 
 ### Run locally (Python)

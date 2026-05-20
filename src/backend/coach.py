@@ -233,7 +233,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
 
     async def chat_with_tools(self, message: str, conversation_history: list = None,
                               board_context: dict = None, pattern_context: dict = None,
-                              include_book: bool = True) -> dict:
+                              include_book: bool = True, api_key: str = None) -> dict:
         """Chat with Claude using tool calling for board control.
 
         Args:
@@ -241,10 +241,17 @@ Only generate a lesson plan when the student explicitly agrees to practice.
             conversation_history: List of previous messages [{"role": ..., "content": ...}]
             board_context: Optional dict with fen, last_move, mode
             pattern_context: Optional dict with pattern analysis data
+            api_key: Optional caller-provided Anthropic key (BYOK). When given,
+                a transient client is used for this call instead of the server's
+                key — this is how visitors bypass the demo budget cap.
 
         Returns:
             Dict with "message", "board_control", and "suggested_action"
         """
+        # BYOK: use a transient client built from the caller's key; otherwise
+        # fall back to the server's shared client.
+        client = AsyncAnthropic(api_key=api_key, max_retries=2) if api_key else self.client
+
         messages = []
 
         if conversation_history:
@@ -259,7 +266,7 @@ Only generate a lesson plan when the student explicitly agrees to practice.
             "content": message
         })
 
-        response = await self.client.messages.create(
+        response = await client.messages.create(
             model=self.model,
             max_tokens=4096,
             tools=[BOARD_CONTROL_TOOL, START_GAME_TOOL],

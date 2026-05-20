@@ -490,4 +490,51 @@ Session-by-session record of what was accomplished, what worked, what didn't, an
 
 ---
 
+## Session 10 - 2026-05-20 (Production Hosting on Fly.io)
+
+**Goal:** Get the app onto a public HTTPS URL, with API-cost protection so a public visitor can't run up the Anthropic bill
+**Duration:** ~1 session
+**Outcome:** Code complete & locally verified; Docker build + Fly deploy pending (need Docker/flyctl + a real key)
+
+### Accomplished
+**Single-origin serving (engine.py, main.py, frontend):**
+- `engine.py` — Stockfish path now reads `STOCKFISH_PATH` env, default `/usr/games/stockfish`
+- `main.py` — mounted `src/frontend/` via `StaticFiles(html=True)` (declared last, after `/api/*`)
+- Renamed `chessboard.html` → `index.html`; frontend `API_BASE_URL` now `''` (same origin)
+- Verified: page, `/api/health`, and all static assets serve from one origin on :8000
+
+**API-cost protection — server cap + BYOK (budget.py, coach.py, main.py):**
+- New `budget.py` — `BudgetGuard` with per-IP + global daily token caps, in-memory, day-rollover reset; `tokens_charged()` counts input + output + cache_creation (skips cheap cache reads); `client_ip()` honors `Fly-Client-IP`/`X-Forwarded-For`
+- `coach.py` — `chat_with_tools(api_key=...)` builds a transient client for BYOK calls
+- `main.py` — `/api/chat` and `/api/coach/move` read `X-User-Api-Key`; demo callers gated by budget, BYOK bypasses; new `GET /api/budget`; `402 demo_budget_exhausted` response carries budget status
+- CORS now env-configurable via `ALLOWED_ORIGINS` (default `*`)
+- Verified: 402 gating with no key, BYOK header bypasses gate (proven via 401 from a dummy key)
+
+**Demo token meter + warnings (index.html):**
+- Progress bar near chat ("Demo budget: NN% left"), green → amber → red
+- One-time toasts at 35% and 10% remaining (`budgetWarned35`/`budgetWarned10` flags)
+- BYOK key field (password input, persisted to `localStorage`), `coachHeaders()` attaches the key
+- Bar hides when a BYOK key is active; `fetchBudget()` renders on load
+
+**Dockerization (Dockerfile, .dockerignore):**
+- `python:3.12-slim`, apt Stockfish, non-root user, preserves `src/` + `data/` layout, port 8000
+- `.dockerignore` excludes venv, .git, .env, docs, PGN-files
+
+### Issues Encountered
+- No Docker daemon or flyctl in the dev environment → could not test the image build or deploy
+  - Most likely first-build risk: the apt Stockfish package name / binary path. Easy to fix on first real build.
+- Token meter is per-IP and in-memory → resets when the Fly machine sleeps/restarts (accepted for a demo)
+
+### Key Learnings
+- With prompt caching, `input_tokens` already excludes the cached book prefix, so charging `input + output + cache_creation` cleanly captures real cost without double-counting cheap cache reads
+- Mounting StaticFiles must come after all API routes or the catch-all `/` shadows them
+- Behind Fly's proxy, `request.client.host` is the proxy — use the forwarded headers for real per-visitor limits
+
+### Next Session
+- Run `docker build` + `fly deploy` (runbook in `docs/incoming/session-10/TASKS.md`, Task D)
+- After deploy: set `ALLOWED_ORIGINS` to the live URL; tune `PER_IP_TOKEN_CAP` / `DAILY_TOKEN_CAP` from real usage
+- Deferred from HOSTING_READINESS: pytest suite (Priority 1), split `index.html` into `index.html`/`styles.css`/`app.js` (Priority 4)
+
+---
+
 *Add new sessions as you go. Be honest about what didn't work—it helps debugging later.*

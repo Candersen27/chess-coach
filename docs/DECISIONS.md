@@ -411,4 +411,66 @@ This document tracks key technical and design decisions with rationale. When Cla
 
 ---
 
+### [DECISION-024] Host on Fly.io (container platform), not serverless
+**Date:** 2026-05-20
+**Status:** Accepted
+**Context:** The app needs a public HTTPS home. Stockfish runs as a spawned subprocess via `python-chess`, and the backend holds it open for the process lifetime.
+**Decision:** Deploy a single Docker container to Fly.io.
+**Rationale:**
+- Serverless (Vercel/Netlify functions) can't run a long-lived subprocess like Stockfish — disqualified.
+- Fly reads our Dockerfile directly, gives free automatic HTTPS + a `*.fly.dev` URL, and runs a real VM that supports the subprocess.
+- Lower friction than a hand-managed VPS for a one-day go-live, while still being "real infra."
+**Consequences:**
+- Requires a `Dockerfile` (shipped this session) and `fly.toml`.
+- VM sized to 1GB RAM (Stockfish is memory-hungry; 512MB is tight).
+- Fly machines auto-sleep when idle → ~10s cold start on first hit (acceptable for a portfolio demo).
+
+---
+
+### [DECISION-025] Server key with per-IP demo cap + BYOK fallback
+**Date:** 2026-05-20
+**Status:** Accepted
+**Context:** Public chat coaching uses the server's Anthropic key. The ~57K-token cached book prefix plus per-message tokens mean an unprotected public key is a real financial risk.
+**Decision:** Serve Claude coaching on the server key up to a per-IP daily token cap; when exhausted, the UI invites the visitor to paste their own key (BYOK, sent via `X-User-Api-Key`), which bypasses the cap.
+**Rationale:**
+- Reviewers experience the flagship feature live without any setup, on a bounded budget.
+- Heavy users / exhausted visitors can continue on their own dime.
+- `chat_with_tools(api_key=...)` builds a transient client per BYOK call; the server client remains the default.
+**Consequences:**
+- New `budget.py` guard; chat endpoints read the header and gate demo callers.
+- `402 demo_budget_exhausted` is a normal control-flow response, not an error.
+- Budget is charged on `input + output + cache_creation` tokens (cache reads are ~0.1x cost and excluded).
+
+---
+
+### [DECISION-026] In-memory budget tracking (per-IP + global)
+**Date:** 2026-05-20
+**Status:** Accepted
+**Context:** The demo cap needs somewhere to store per-IP and global daily token counts.
+**Decision:** Track counts in process memory, reset on calendar-day change. No database this session.
+**Rationale:**
+- Simplest thing that protects spend; zero infra.
+- A portfolio demo doesn't need durable accounting.
+**Consequences:**
+- Counts reset when the Fly machine restarts or wakes from sleep — a visitor's bar can refill. Accepted tradeoff.
+- Real visitor IP comes from `Fly-Client-IP` / `X-Forwarded-For` (behind Fly's proxy), falling back to the socket peer locally.
+- Future upgrade path: SQLite or Redis if durable limits are ever needed.
+
+---
+
+### [DECISION-027] Serve the frontend from FastAPI StaticFiles (single origin)
+**Date:** 2026-05-20
+**Status:** Accepted
+**Context:** The frontend hardcoded `http://localhost:8000` and was opened as a local file, which doesn't work when deployed and forced permissive CORS.
+**Decision:** Mount `src/frontend/` via `StaticFiles(html=True)` (renamed `chessboard.html` → `index.html`), and make the API base URL relative (`''`).
+**Rationale:**
+- One origin means the frontend works in production unchanged and CORS becomes a non-issue.
+- Eliminates the manual "open the HTML file" step — everything is served from `/`.
+**Consequences:**
+- The mount is declared **last** so it doesn't shadow `/api/*` routes.
+- CORS is now env-configurable via `ALLOWED_ORIGINS` (defaults to `*`), to lock down post-deploy.
+- For separate local dev against a standalone backend, set `API_BASE_URL` back to `http://localhost:8000`.
+
+---
+
 *Add new decisions as they're made. Don't delete old ones—mark as superseded if changed.*

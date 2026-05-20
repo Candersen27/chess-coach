@@ -2,6 +2,7 @@
 Stockfish chess engine wrapper for analysis.
 """
 
+import os
 import chess
 import chess.engine
 import chess.pgn
@@ -13,13 +14,15 @@ import asyncio
 class ChessEngine:
     """Wrapper class for Stockfish chess engine."""
 
-    def __init__(self, engine_path: str = "/usr/games/stockfish"):
+    def __init__(self, engine_path: str = None):
         """Initialize the chess engine wrapper.
 
         Args:
-            engine_path: Path to the Stockfish binary
+            engine_path: Path to the Stockfish binary. Defaults to the
+                STOCKFISH_PATH env var, or /usr/games/stockfish (the Debian
+                apt install location, which also matches our container).
         """
-        self.engine_path = engine_path
+        self.engine_path = engine_path or os.getenv("STOCKFISH_PATH", "/usr/games/stockfish")
         self.transport: Optional[asyncio.SubprocessTransport] = None
         self.engine: Optional[chess.engine.UciProtocol] = None
 

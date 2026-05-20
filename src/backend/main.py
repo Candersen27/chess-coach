@@ -5,8 +5,11 @@ FastAPI backend for chess analysis using Stockfish.
 import logging
 import traceback
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
 
@@ -18,6 +21,7 @@ from engine import ChessEngine
 from coach import ChessCoach
 from books import BookLibrary
 from patterns import PatternDetector
+from budget import guard, client_ip, tokens_charged
 
 
 # Global instances
@@ -55,10 +59,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Enable CORS for development
+# CORS. The frontend is served same-origin in production, so this mainly
+# matters for separate local dev. Lock it down after deploy by setting
+# ALLOWED_ORIGINS to your domain, e.g. "https://chess-coach.fly.dev".
+import os as _os
+_allowed = _os.getenv("ALLOWED_ORIGINS", "*")
+allow_origins = ["*"] if _allowed.strip() == "*" else [o.strip() for o in _allowed.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -183,6 +192,7 @@ class ChatResponse(BaseModel):
     board_control: Optional[dict] = None
     game_action: Optional[dict] = None
     usage: Optional[dict] = None
+    budget: Optional[dict] = None
 
 
 class CoachMoveRequest(BaseModel):
@@ -367,21 +377,53 @@ async def analyze_batch(request: BatchAnalysisRequest):
     }
 
 
+def _byok_key(http_request: Request) -> Optional[str]:
+    """Caller-provided Anthropic key (BYOK) from the request header, if any."""
+    key = http_request.headers.get("x-user-api-key")
+    return key.strip() if key and key.strip() else None
+
+
+def _budget_exhausted_response(ip: str) -> JSONResponse:
+    """Structured 402 telling the frontend to prompt for a BYOK key."""
+    return JSONResponse(
+        status_code=402,
+        content={
+            "error": "demo_budget_exhausted",
+            "message": (
+                "You've used up today's free demo budget for Claude coaching. "
+                "Add your own Anthropic API key to keep chatting."
+            ),
+            "budget": guard.status(ip),
+        },
+    )
+
+
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat_with_coach(request: ChatRequest):
+async def chat_with_coach(request: ChatRequest, http_request: Request):
     """Chat with the chess coach (with board control via tools).
+
+    Cost protection: uses the server key up to a per-IP daily token cap. A
+    caller-provided key (X-User-Api-Key header / BYOK) bypasses the cap.
 
     Args:
         request: Chat request with message, conversation history, and board context
+        http_request: Raw request, for the BYOK header and client IP
 
     Returns:
-        Coach's response with optional board_control for position display
+        Coach's response with optional board_control, plus per-IP budget status
 
     Raises:
         HTTPException: 503 if coach not initialized, 500 for API errors
     """
     if chess_coach is None:
         raise HTTPException(status_code=503, detail="Chess coach not available (check API key)")
+
+    byok = _byok_key(http_request)
+    ip = client_ip(http_request)
+
+    # Demo (server-key) callers are gated by the budget; BYOK bypasses it.
+    if not byok and not guard.check(ip):
+        return _budget_exhausted_response(ip)
 
     try:
         history = [{"role": m.role, "content": m.content} for m in request.conversation_history]
@@ -392,7 +434,16 @@ async def chat_with_coach(request: ChatRequest):
             conversation_history=history,
             board_context=board_ctx,
             pattern_context=request.pattern_context,
+            api_key=byok,
         )
+
+        # Record demo usage and report budget; BYOK reports unlimited.
+        if byok:
+            response["budget"] = {"unlimited": True}
+        else:
+            guard.record(ip, tokens_charged(response.get("usage")))
+            response["budget"] = guard.status(ip)
+
         return response
 
     except RateLimitError as e:
@@ -405,20 +456,30 @@ async def chat_with_coach(request: ChatRequest):
 
 
 @app.post("/api/coach/move")
-async def coach_move_endpoint(request: CoachMoveRequest):
+async def coach_move_endpoint(request: CoachMoveRequest, http_request: Request):
     """Handle user move in Coach Demo mode.
 
     Gets Stockfish analysis of the move, then asks Claude to provide
     coaching feedback with the engine data as context.
 
+    Cost protection mirrors /api/chat: server key gated by per-IP budget,
+    BYOK header bypasses the cap.
+
     Args:
         request: CoachMoveRequest with FEN (before move), move in SAN, and context
+        http_request: Raw request, for the BYOK header and client IP
 
     Returns:
         Coaching response with optional board_control and Stockfish evaluation
     """
     if chess_coach is None:
         raise HTTPException(status_code=503, detail="Chess coach not available (check API key)")
+
+    byok = _byok_key(http_request)
+    ip = client_ip(http_request)
+
+    if not byok and not guard.check(ip):
+        return _budget_exhausted_response(ip)
 
     try:
         # Get Stockfish analysis of the move
@@ -451,12 +512,20 @@ async def coach_move_endpoint(request: CoachMoveRequest):
             message=coaching_prompt,
             conversation_history=request.context.get("conversation_history", []),
             include_book=False,
+            api_key=byok,
         )
+
+        if byok:
+            budget = {"unlimited": True}
+        else:
+            guard.record(ip, tokens_charged(response.get("usage")))
+            budget = guard.status(ip)
 
         return {
             "message": response["message"],
             "board_control": response.get("board_control"),
             "stockfish_eval": move_analysis,
+            "budget": budget,
             "status": "success"
         }
 
@@ -507,6 +576,21 @@ async def list_books():
         })
 
     return {"books": books}
+
+
+@app.get("/api/budget")
+async def get_budget(http_request: Request):
+    """Per-IP demo budget snapshot for the frontend token meter.
+
+    Lets the bar render on page load before any chat has happened.
+    """
+    return guard.status(client_ip(http_request))
+
+
+# Serve the frontend as static files. Mounted LAST so it doesn't shadow the
+# /api/* routes above. html=True serves index.html at "/".
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 
 if __name__ == "__main__":

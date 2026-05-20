@@ -666,6 +666,76 @@
             text-align: right;
         }
 
+        /* Demo token meter */
+        .budget-meter {
+            padding: 6px 10px 2px;
+        }
+        .budget-meter-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+        .budget-meter-track {
+            width: 100%;
+            height: 6px;
+            background: #e6e6e6;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .budget-meter-fill {
+            height: 100%;
+            width: 100%;
+            border-radius: 3px;
+            transition: width 0.4s ease, background-color 0.4s ease;
+            background: #4caf50; /* green; JS shifts to amber/red */
+        }
+        .budget-meter-fill.amber { background: #f0ad4e; }
+        .budget-meter-fill.red { background: #d9534f; }
+
+        /* BYOK key field */
+        .byok-area {
+            padding: 4px 10px 8px;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .byok-area input {
+            flex: 1;
+            font-size: 11px;
+            padding: 4px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .byok-area button {
+            font-size: 11px;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+        .byok-status {
+            font-size: 11px;
+            color: #4caf50;
+            white-space: nowrap;
+        }
+
+        /* One-time low-budget toast */
+        .budget-toast {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            max-width: 300px;
+            padding: 10px 14px;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 13px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .budget-toast.show { opacity: 1; }
+        .budget-toast.amber { background: #f0ad4e; }
+        .budget-toast.red { background: #d9534f; }
+
         .progress-bar-container {
             width: 100%;
             height: 20px;
@@ -1198,6 +1268,17 @@
                                onkeypress="handleChatKeypress(event)">
                         <button id="chatSendBtn" onclick="sendChatMessage()">Send</button>
                     </div>
+                    <div id="budgetMeter" class="budget-meter" style="display:none;">
+                        <div class="budget-meter-label">Demo budget: <span id="budgetPct">100</span>% left</div>
+                        <div class="budget-meter-track">
+                            <div id="budgetMeterFill" class="budget-meter-fill"></div>
+                        </div>
+                    </div>
+                    <div class="byok-area">
+                        <input type="password" id="byokInput" placeholder="Your Anthropic API key (optional)">
+                        <button id="byokSaveBtn" onclick="saveByokKey()">Save</button>
+                        <span id="byokStatus" class="byok-status"></span>
+                    </div>
                     <div id="tokenUsage" class="token-usage"></div>
                 </div>
             </div>
@@ -1711,7 +1792,11 @@
         });
 
         // Position Analysis Functions
-        const API_BASE_URL = 'http://localhost:8000';
+        // Empty string = same origin. The backend serves this page via
+        // StaticFiles in production, so all fetches are same-origin.
+        // For local dev against a separately-run backend, set this to
+        // 'http://localhost:8000'.
+        const API_BASE_URL = '';
 
         async function analyzeCurrentPosition() {
             const analysisPanel = document.getElementById('analysisPanel');
@@ -2507,6 +2592,114 @@
             el.textContent = `Tokens: ${total.toLocaleString()} (in: ${sessionTokenUsage.input.toLocaleString()}, out: ${sessionTokenUsage.output.toLocaleString()}, cached: ${sessionTokenUsage.cacheRead.toLocaleString()})`;
         }
 
+        // ---- Demo budget + BYOK ----
+        // Once-per-page-session flags so each low-budget warning fires once.
+        let budgetWarned35 = false;
+        let budgetWarned10 = false;
+
+        function getByokKey() {
+            return localStorage.getItem('byok_key') || '';
+        }
+
+        // Headers for the two Claude-backed endpoints: adds the BYOK key when set.
+        function coachHeaders() {
+            const headers = { 'Content-Type': 'application/json' };
+            const key = getByokKey();
+            if (key) headers['X-User-Api-Key'] = key;
+            return headers;
+        }
+
+        function saveByokKey() {
+            const input = document.getElementById('byokInput');
+            const key = input.value.trim();
+            if (key) {
+                localStorage.setItem('byok_key', key);
+            } else {
+                localStorage.removeItem('byok_key');
+            }
+            input.value = '';
+            refreshByokStatus();
+            // With a key set the demo cap no longer applies; reset warnings and
+            // refresh the meter (it will hide / show "unlimited").
+            budgetWarned35 = false;
+            budgetWarned10 = false;
+            if (getByokKey()) {
+                updateBudgetMeter({ unlimited: true });
+            } else {
+                fetchBudget();
+            }
+        }
+
+        function refreshByokStatus() {
+            const status = document.getElementById('byokStatus');
+            status.textContent = getByokKey() ? 'Using your key' : '';
+        }
+
+        // Render the meter from a budget object: {unlimited:true} or
+        // {used, cap, remaining_pct}.
+        function updateBudgetMeter(budget) {
+            const meter = document.getElementById('budgetMeter');
+            if (!budget) return;
+
+            // BYOK active: the cap doesn't apply — hide the demo bar.
+            if (budget.unlimited || getByokKey()) {
+                meter.style.display = 'none';
+                return;
+            }
+
+            const pct = Math.max(0, Math.min(100, budget.remaining_pct ?? 100));
+            meter.style.display = 'block';
+            document.getElementById('budgetPct').textContent = pct;
+
+            const fill = document.getElementById('budgetMeterFill');
+            fill.style.width = pct + '%';
+            fill.classList.remove('amber', 'red');
+            if (pct < 10) fill.classList.add('red');
+            else if (pct < 35) fill.classList.add('amber');
+
+            // One-time threshold warnings.
+            if (pct <= 10 && !budgetWarned10) {
+                budgetWarned10 = true;
+                budgetWarned35 = true; // skip the 35% toast if we jumped past it
+                showBudgetToast('red', "Almost out of demo budget — add your own API key below to keep chatting.");
+            } else if (pct <= 35 && !budgetWarned35) {
+                budgetWarned35 = true;
+                showBudgetToast('amber', "Heads up — you've used most of today's free demo budget.");
+            }
+        }
+
+        function showBudgetToast(level, text) {
+            const toast = document.createElement('div');
+            toast.className = 'budget-toast ' + level;
+            toast.textContent = text;
+            document.body.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.add('show'));
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 5000);
+        }
+
+        // Called when a chat endpoint returns 402 demo_budget_exhausted.
+        function handleBudgetExhausted(data) {
+            updateBudgetMeter(data.budget || { remaining_pct: 0, used: 0, cap: 1 });
+            addChatMessage('assistant', (data.message || "Demo budget reached.") +
+                " Enter your own Anthropic API key in the field below to continue.");
+            const input = document.getElementById('byokInput');
+            if (input) input.focus();
+        }
+
+        async function fetchBudget() {
+            try {
+                if (getByokKey()) { updateBudgetMeter({ unlimited: true }); return; }
+                const res = await fetch(`${API_BASE_URL}/api/budget`);
+                if (res.ok) updateBudgetMeter(await res.json());
+            } catch (e) {
+                // Non-fatal — the meter just stays hidden.
+                console.warn('Budget fetch failed:', e);
+            }
+        }
+
         function initChat() {
             addChatMessage('assistant', "Hi! I'm your chess coach. What would you like to work on today?");
         }
@@ -2552,9 +2745,16 @@
 
                 const response = await fetch(`${API_BASE_URL}/api/chat`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: coachHeaders(),
                     body: JSON.stringify(chatPayload)
                 });
+
+                // Demo budget used up — prompt for a BYOK key instead of erroring.
+                if (response.status === 402) {
+                    removeChatMessage(thinkingId);
+                    handleBudgetExhausted(await response.json());
+                    return;
+                }
 
                 if (!response.ok) {
                     const err = await response.json();
@@ -2566,6 +2766,9 @@
                 // Remove thinking indicator, show real response
                 removeChatMessage(thinkingId);
                 addChatMessage('assistant', data.message);
+
+                // Update the demo budget meter
+                updateBudgetMeter(data.budget);
 
                 // Handle board control if Claude demonstrated a position
                 if (data.board_control) {
@@ -2676,6 +2879,8 @@
         // Initialize chat on page load
         $(document).ready(function() {
             initChat();
+            refreshByokStatus();
+            fetchBudget();
         });
 
         // ===== Board Control: Game State Management (Tasks 6-10) =====
@@ -2853,7 +3058,7 @@
             try {
                 const response = await fetch(API_BASE_URL + '/api/coach/move', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: coachHeaders(),
                     body: JSON.stringify({
                         fen: fenBefore,
                         move: moveSan,
@@ -2866,6 +3071,13 @@
                     })
                 });
 
+                // Demo budget used up — prompt for a BYOK key instead of erroring.
+                if (response.status === 402) {
+                    hideCoachThinking();
+                    handleBudgetExhausted(await response.json());
+                    return;
+                }
+
                 if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.detail || 'Failed to get coaching response');
@@ -2877,6 +3089,9 @@
 
                 // Add coach response to chat
                 addChatMessage('assistant', data.message);
+
+                // Update the demo budget meter
+                updateBudgetMeter(data.budget);
 
                 // Update conversation history
                 conversationHistory.push({ role: 'user', content: 'I played: ' + moveSan });

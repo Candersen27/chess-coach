@@ -1,0 +1,22 @@
+# Python
+venv/
+__pycache__/
+*.py[cod]
+
+# Secrets — provided as runtime env / fly secrets, never baked in
+.env
+
+# VCS & local-only
+.git/
+.gitignore
+
+# Not needed at runtime
+PGN-files/
+docs/
+scripts/
+test-positions.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
